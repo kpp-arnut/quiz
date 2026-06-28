@@ -3,328 +3,842 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>ระบบสอบออนไลน์ ชีววิทยา — ลักษณะสิ่งมีชีวิต + เคมีพื้นฐาน</title>
+<title>ระบบสอบออนไลน์ — ชีววิทยา</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
-<!-- KaTeX -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
 <style>
+/* ══════════════════════════════
+   DESIGN TOKENS
+══════════════════════════════ */
 :root {
-  --ink-950: #0b1220;
-  --ink-900: #111a2e;
-  --ink-800: #182441;
-  --ink-700: #25324f;
-  --ink-600: #3a4a6b;
-  --paper:    #eef1f7;
-  --paper-dim:#9aa7c2;
-  --gold:     #c9a04e;
-  --gold-dim: #8a7038;
-  --alert:    #d6553f;
-  --alert-bg: #2b1512;
-  --safe:     #4f9a72;
-  --safe-bg:  #122418;
-  --accent:   #5b8dee;
-  --accent-bg:#0d1e3a;
-  --serif: 'Noto Serif Thai','Sarabun',serif;
-  --sans:  'Sarabun','Noto Sans Thai',sans-serif;
-  --mono:  'JetBrains Mono','Courier New',monospace;
-  --radius: 3px;
+  /* Base palette — deep navy academic */
+  --bg:        #080e1a;
+  --surface:   #0d1525;
+  --surface-2: #121d30;
+  --surface-3: #1a2740;
+  --border:    #1f2f4a;
+  --border-2:  #2a3f5f;
+
+  /* Text */
+  --text:      #e8edf5;
+  --text-2:    #8fa3c0;
+  --text-3:    #4d6380;
+
+  /* Accent — warm amber (ink on old exam paper feel) */
+  --gold:      #d4a847;
+  --gold-dim:  #7a5f20;
+  --gold-bg:   rgba(212,168,71,.07);
+
+  /* Status */
+  --green:     #3fb37a;
+  --green-bg:  rgba(63,179,122,.08);
+  --red:       #e05555;
+  --red-bg:    rgba(224,85,85,.08);
+  --blue:      #5b8dee;
+  --blue-bg:   rgba(91,141,238,.08);
+  --amber:     #e09333;
+  --amber-bg:  rgba(224,147,51,.08);
+
+  /* Typography */
+  --font-display: 'Sarabun', 'Noto Sans Thai', sans-serif;
+  --font-body:    'Sarabun', 'Noto Sans Thai', sans-serif;
+  --font-mono:    'JetBrains Mono', 'Courier New', monospace;
+
+  --radius-sm: 4px;
+  --radius:    6px;
+  --radius-lg: 10px;
+
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.3);
+  --shadow:    0 4px 16px rgba(0,0,0,.4);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,.5);
 }
-*{box-sizing:border-box;}
-html,body{margin:0;padding:0;background:var(--ink-950);color:var(--paper);font-family:var(--sans);-webkit-font-smoothing:antialiased;}
-body{min-height:100vh;background-image:radial-gradient(ellipse 80% 50% at 50% -10%,rgba(201,160,78,.06),transparent),linear-gradient(var(--ink-950),var(--ink-950));}
-.hidden{display:none!important;}
-button{font-family:inherit;cursor:pointer;}
-::selection{background:var(--gold-dim);color:var(--ink-950);}
 
-#statusBar{position:sticky;top:0;z-index:100;display:flex;align-items:center;background:var(--ink-900);border-bottom:1px solid var(--gold-dim);padding:0 20px;height:52px;font-family:var(--mono);font-size:13px;letter-spacing:.02em;}
-.status-seg{display:flex;align-items:center;gap:8px;padding:0 18px;height:100%;border-right:1px solid var(--ink-700);color:var(--paper-dim);white-space:nowrap;}
-.status-seg:first-child{padding-left:0;}
-.status-dot{width:8px;height:8px;border-radius:50%;background:var(--paper-dim);flex-shrink:0;}
-.status-dot.live{background:var(--safe);animation:pulse-dot 2s infinite;}
-.status-dot.warn{background:var(--gold);animation:pulse-dot 1.2s infinite;}
-.status-dot.danger{background:var(--alert);animation:pulse-dot .8s infinite;}
-@keyframes pulse-dot{0%{box-shadow:0 0 0 0 currentColor;}70%{box-shadow:0 0 0 6px transparent;}100%{box-shadow:0 0 0 0 transparent;}}
-.status-val{color:var(--paper);font-weight:600;}
-.timer-group{display:flex;align-items:center;gap:16px;margin-left:auto;padding-left:18px;}
-.timer-block{display:flex;flex-direction:column;align-items:flex-end;}
-.timer-label{font-size:9px;color:var(--paper-dim);letter-spacing:.12em;text-transform:uppercase;line-height:1;margin-bottom:2px;}
-.timer-val{font-size:17px;font-weight:700;color:var(--paper);letter-spacing:.06em;line-height:1;font-family:var(--mono);}
-.timer-val.crit{color:var(--alert);}
-.timer-divider{width:1px;height:30px;background:var(--ink-700);}
-#btnTeacherLogin{margin-left:auto;background:transparent;border:1px solid var(--ink-600);color:var(--paper-dim);padding:6px 14px;border-radius:var(--radius);font-family:var(--mono);font-size:11px;letter-spacing:.08em;cursor:pointer;transition:border-color .15s,color .15s;white-space:nowrap;}
-#btnTeacherLogin:hover{border-color:var(--gold);color:var(--gold);}
-#btnTeacherLogin.teacher-active{border-color:var(--safe);color:var(--safe);}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.6;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  background-image:
+    radial-gradient(ellipse 70% 40% at 50% 0%, rgba(212,168,71,.04), transparent),
+    radial-gradient(ellipse 40% 30% at 100% 100%, rgba(91,141,238,.03), transparent);
+}
 
-#app{max-width:880px;margin:0 auto;padding:40px 20px 100px;}
-.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin:0 0 10px;}
-h1.exam-title{font-family:var(--serif);font-size:28px;font-weight:600;margin:0 0 6px;color:var(--paper);}
-.exam-meta{color:var(--paper-dim);font-size:14px;margin-bottom:32px;}
+.hidden { display: none !important; }
+button { font-family: inherit; cursor: pointer; }
+::selection { background: var(--gold-dim); color: var(--bg); }
 
-.card{background:var(--ink-900);border:1px solid var(--ink-700);border-radius:var(--radius);padding:32px;}
-.card+.card{margin-top:20px;}
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--surface); }
+::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
 
-.reg-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:24px 0;}
-.field{display:flex;flex-direction:column;gap:6px;}
-.field label{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);}
-.field input,.field select{background:var(--ink-800);border:1px solid var(--ink-700);border-radius:var(--radius);color:var(--paper);font-family:var(--sans);font-size:15px;padding:12px 14px;outline:none;transition:border-color .15s;width:100%;}
-.field input:focus,.field select:focus{border-color:var(--gold);}
-.field input::placeholder{color:var(--ink-600);}
-.field select option{background:var(--ink-800);}
-.field-error{font-size:12px;color:var(--alert);margin-top:2px;display:none;}
-.field.has-error input,.field.has-error select{border-color:var(--alert);}
-.field.has-error .field-error{display:block;}
-.info-box{border-radius:var(--radius);padding:14px 18px;font-size:13px;line-height:1.7;margin-bottom:8px;}
-.info-box.accent{background:var(--accent-bg);border:1px solid var(--accent);color:#b0c8f5;}
-.info-box.warn{background:var(--alert-bg);border:1px solid var(--alert);color:#f0c9c0;}
+/* ══════════════════════════════
+   STATUS BAR
+══════════════════════════════ */
+#statusBar {
+  position: sticky; top: 0; z-index: 200;
+  display: flex; align-items: center; gap: 0;
+  background: rgba(8,14,26,.95);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  height: 48px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: .02em;
+}
+.sb-seg {
+  display: flex; align-items: center; gap: 6px;
+  padding: 0 16px; height: 100%;
+  border-right: 1px solid var(--border);
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.sb-seg:last-child { border-right: none; }
+.sb-val { color: var(--text); font-weight: 600; }
+.sb-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--text-3); flex-shrink: 0;
+  transition: background .3s;
+}
+.sb-dot.live  { background: var(--green); box-shadow: 0 0 0 2px rgba(63,179,122,.2); animation: pulse 2s infinite; }
+.sb-dot.warn  { background: var(--amber); box-shadow: 0 0 0 2px rgba(224,147,51,.2); animation: pulse 1.2s infinite; }
+.sb-dot.danger{ background: var(--red);   box-shadow: 0 0 0 2px rgba(224,85,85,.2);  animation: pulse .7s  infinite; }
+@keyframes pulse {
+  0%,100% { box-shadow: 0 0 0 2px rgba(255,255,255,.05); }
+  50%      { box-shadow: 0 0 0 5px rgba(255,255,255,.0); }
+}
+.sb-timers {
+  display: flex; align-items: center; gap: 20px;
+  margin-left: auto; padding: 0 16px;
+  border-left: 1px solid var(--border);
+}
+.sb-timer-block { display: flex; flex-direction: column; align-items: flex-end; }
+.sb-timer-label {
+  font-size: 8px; letter-spacing: .15em; text-transform: uppercase;
+  color: var(--text-3); line-height: 1; margin-bottom: 1px;
+}
+.sb-timer-val {
+  font-size: 16px; font-weight: 700; font-family: var(--font-mono);
+  color: var(--text); line-height: 1; letter-spacing: .04em;
+  transition: color .3s;
+}
+.sb-timer-val.warn  { color: var(--amber); }
+.sb-timer-val.crit  { color: var(--red); }
+.sb-divider { width: 1px; height: 28px; background: var(--border); }
+#btnTeacherLogin {
+  background: transparent; border: 1px solid var(--border-2); color: var(--text-3);
+  padding: 5px 12px; border-radius: var(--radius-sm);
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em;
+  transition: all .2s; white-space: nowrap; margin-left: 8px;
+}
+#btnTeacherLogin:hover { border-color: var(--gold); color: var(--gold); }
+#btnTeacherLogin.active { border-color: var(--green); color: var(--green); }
 
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:13px 28px;border-radius:var(--radius);font-size:14px;font-weight:600;letter-spacing:.01em;border:1px solid transparent;transition:filter .15s ease,transform .1s ease;}
-.btn:active{transform:translateY(1px);}
-.btn-primary{background:var(--gold);color:var(--ink-950);}
-.btn-primary:hover{filter:brightness(1.08);}
-.btn-primary:disabled{background:var(--ink-700);color:var(--paper-dim);cursor:not-allowed;}
-.btn-ghost{background:transparent;border-color:var(--ink-600);color:var(--paper-dim);}
-.btn-ghost:hover{border-color:var(--paper-dim);color:var(--paper);}
-.btn-ghost:disabled{opacity:.4;cursor:not-allowed;}
-.btn-danger{background:var(--alert);color:#fff;}
-.btn-safe{background:var(--safe);color:var(--ink-950);}
-.btn-accent{background:var(--accent);color:#fff;}
-.btn-sm{padding:8px 16px;font-size:12px;}
-.btn-row{display:flex;gap:12px;margin-top:28px;}
+/* ══════════════════════════════
+   STEP INDICATOR
+══════════════════════════════ */
+#stepIndicator {
+  display: flex; align-items: center; justify-content: center;
+  gap: 0; padding: 20px 20px 0; max-width: 600px; margin: 0 auto;
+}
+.step {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  flex: 1; position: relative;
+}
+.step:not(:last-child)::after {
+  content: ''; position: absolute; top: 14px; left: calc(50% + 16px);
+  right: calc(-50% + 16px); height: 1px;
+  background: var(--border); transition: background .4s;
+}
+.step.done:not(:last-child)::after { background: var(--gold-dim); }
+.step-circle {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 1.5px solid var(--border-2); background: var(--surface);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  color: var(--text-3); transition: all .3s; z-index: 1;
+}
+.step.active .step-circle { border-color: var(--gold); background: var(--gold-bg); color: var(--gold); }
+.step.done  .step-circle { border-color: var(--green); background: var(--green-bg); color: var(--green); }
+.step-label { font-size: 10px; color: var(--text-3); letter-spacing: .04em; white-space: nowrap; transition: color .3s; }
+.step.active .step-label { color: var(--gold); }
+.step.done  .step-label  { color: var(--green); }
 
-.gate-checklist{list-style:none;margin:24px 0;padding:0;display:flex;flex-direction:column;gap:12px;}
-.gate-item{display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--ink-800);border:1px solid var(--ink-700);border-radius:var(--radius);font-size:14px;}
-.gate-item .mark{width:22px;height:22px;border-radius:50%;border:2px solid var(--ink-600);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:transparent;}
-.gate-item.ok .mark{border-color:var(--safe);background:var(--safe);color:var(--ink-950);}
-.gate-item.ok .mark::after{content:'✓';}
-.gate-item.fail .mark{border-color:var(--alert);color:var(--alert);}
-.gate-item.fail .mark::after{content:'!';}
-.gate-item .label{flex:1;}
-.gate-item .sub{color:var(--paper-dim);font-size:12px;}
-#gateCamPreview{width:160px;height:120px;background:#000;border-radius:var(--radius);border:1px solid var(--ink-600);object-fit:cover;margin:16px 0;transform:scaleX(-1);}
-.rules-box{background:var(--alert-bg);border:1px solid var(--alert);border-radius:var(--radius);padding:18px 20px;margin:24px 0;font-size:13.5px;line-height:1.8;color:#f0c9c0;}
-.rules-box strong{color:#fff;}
-.rules-box ul{margin:8px 0 0;padding-left:20px;}
+/* ══════════════════════════════
+   LAYOUT
+══════════════════════════════ */
+#app { max-width: 860px; margin: 0 auto; padding: 32px 20px 100px; }
 
-/* topic badge */
-.topic-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:2px;font-family:var(--mono);font-size:10px;letter-spacing:.08em;margin-bottom:14px;}
-.topic-badge.bio{background:rgba(79,154,114,.12);border:1px solid var(--safe);color:var(--safe);}
-.topic-badge.chem{background:rgba(91,141,238,.12);border:1px solid var(--accent);color:var(--accent);}
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 32px;
+  box-shadow: var(--shadow);
+}
+.card + .card { margin-top: 16px; }
 
-#examScreen{display:none;}
-.q-timer-bar-wrap{display:flex;align-items:center;gap:12px;margin-bottom:18px;}
-.q-timer-bar-track{flex:1;height:6px;background:var(--ink-700);border-radius:3px;overflow:hidden;}
-.q-timer-bar-fill{height:100%;border-radius:3px;background:var(--safe);transition:width .5s linear,background .5s ease;}
-.q-timer-bar-fill.warn{background:var(--gold);}
-.q-timer-bar-fill.crit{background:var(--alert);}
-.q-timer-label{font-family:var(--mono);font-size:12px;color:var(--paper-dim);white-space:nowrap;min-width:44px;text-align:right;}
-.q-timer-label.crit{color:var(--alert);font-weight:700;}
-.progress-track{height:4px;background:var(--ink-700);border-radius:2px;overflow:hidden;margin-bottom:28px;}
-.progress-fill{height:100%;background:var(--gold);transition:width .3s ease;}
-.q-counter{font-family:var(--mono);font-size:12px;color:var(--gold);letter-spacing:.1em;margin-bottom:14px;}
-.q-text{font-family:var(--serif);font-size:20px;line-height:1.6;margin:0 0 20px;color:var(--paper);}
+.eyebrow {
+  font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: .2em; text-transform: uppercase;
+  color: var(--gold); margin-bottom: 8px;
+}
+.page-title {
+  font-size: 24px; font-weight: 700;
+  color: var(--text); margin-bottom: 4px; line-height: 1.3;
+}
+.page-sub { color: var(--text-2); font-size: 14px; margin-bottom: 24px; }
 
-.q-image-wrap{margin:0 0 20px;border-radius:var(--radius);overflow:hidden;border:1px solid var(--ink-700);background:var(--ink-800);text-align:center;}
-.q-image-wrap img{max-width:100%;max-height:340px;object-fit:contain;display:block;margin:0 auto;}
-.q-image-caption{font-size:11px;color:var(--paper-dim);font-family:var(--mono);padding:6px 10px;border-top:1px solid var(--ink-700);text-align:center;}
+/* ══════════════════════════════
+   FORM
+══════════════════════════════ */
+.reg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 20px 0; }
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field label {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--gold);
+}
+.field input, .field select {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--radius); color: var(--text);
+  font-family: var(--font-body); font-size: 15px; padding: 11px 14px;
+  outline: none; transition: border-color .15s, box-shadow .15s; width: 100%;
+}
+.field input:focus, .field select:focus {
+  border-color: var(--gold); box-shadow: 0 0 0 3px rgba(212,168,71,.1);
+}
+.field input::placeholder { color: var(--text-3); }
+.field select option { background: var(--surface-2); }
+.field-error { font-size: 12px; color: var(--red); display: none; }
+.field.has-error input, .field.has-error select { border-color: var(--red); }
+.field.has-error .field-error { display: block; }
 
-.choices{display:flex;flex-direction:column;gap:10px;}
-.choice{display:flex;align-items:flex-start;gap:14px;padding:16px 18px;background:var(--ink-800);border:1px solid var(--ink-700);border-radius:var(--radius);cursor:pointer;transition:border-color .15s ease,background .15s ease;}
-.choice:hover{border-color:var(--ink-600);}
-.choice.selected{border-color:var(--gold);background:rgba(201,160,78,.08);}
-.choice .letter{width:26px;height:26px;border-radius:50%;border:1.5px solid var(--ink-600);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--paper-dim);flex-shrink:0;}
-.choice.selected .letter{border-color:var(--gold);background:var(--gold);color:var(--ink-950);}
-.choice .ctext{padding-top:3px;line-height:1.55;}
-.nav-row{display:flex;justify-content:space-between;align-items:center;margin-top:32px;}
-.q-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(34px,1fr));gap:6px;margin-top:20px;}
-.q-grid-item{aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;border-radius:2px;border:1px solid var(--ink-700);background:var(--ink-800);color:var(--paper-dim);cursor:pointer;position:relative;}
-.q-grid-item.answered{border-color:var(--gold-dim);color:var(--gold);}
-.q-grid-item.current{border-color:var(--gold);background:var(--gold);color:var(--ink-950);font-weight:700;}
-.q-grid-item .q-spent-dot{position:absolute;bottom:2px;right:2px;width:4px;height:4px;border-radius:50%;background:var(--accent);opacity:0;}
-.q-grid-item.has-time .q-spent-dot{opacity:1;}
+/* ══════════════════════════════
+   BUTTONS
+══════════════════════════════ */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 11px 24px; border-radius: var(--radius); font-size: 14px;
+  font-weight: 600; border: 1px solid transparent;
+  transition: all .2s; cursor: pointer; white-space: nowrap;
+  font-family: var(--font-body);
+}
+.btn:active { transform: translateY(1px); }
+.btn-primary { background: var(--gold); color: var(--bg); border-color: var(--gold); }
+.btn-primary:hover { filter: brightness(1.1); box-shadow: 0 4px 14px rgba(212,168,71,.3); }
+.btn-primary:disabled { background: var(--surface-3); color: var(--text-3); border-color: var(--border); box-shadow: none; cursor: not-allowed; filter: none; }
+.btn-ghost { background: transparent; border-color: var(--border-2); color: var(--text-2); }
+.btn-ghost:hover { border-color: var(--text-2); color: var(--text); }
+.btn-ghost:disabled { opacity: .4; cursor: not-allowed; }
+.btn-danger { background: var(--red); color: #fff; }
+.btn-danger:hover { filter: brightness(1.1); }
+.btn-safe   { background: var(--green); color: var(--bg); }
+.btn-safe:hover { filter: brightness(1.1); }
+.btn-accent { background: var(--blue); color: #fff; }
+.btn-sm { padding: 7px 14px; font-size: 12px; }
+.btn-row { display: flex; gap: 10px; margin-top: 24px; flex-wrap: wrap; }
 
-.shuffle-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(201,160,78,.12);border:1px solid var(--gold-dim);color:var(--gold);font-family:var(--mono);font-size:10px;letter-spacing:.08em;padding:3px 9px;border-radius:2px;margin-bottom:16px;}
+/* ══════════════════════════════
+   INFO BOXES
+══════════════════════════════ */
+.info-box {
+  border-radius: var(--radius); padding: 12px 16px;
+  font-size: 13px; line-height: 1.7; margin-bottom: 14px;
+  display: flex; gap: 10px; align-items: flex-start;
+}
+.info-box .info-icon { flex-shrink: 0; font-size: 14px; margin-top: 1px; }
+.info-box.blue  { background: var(--blue-bg);  border: 1px solid rgba(91,141,238,.3);  color: #b0c8f5; }
+.info-box.amber { background: var(--amber-bg); border: 1px solid rgba(224,147,51,.3);  color: #f5d7a0; }
+.info-box.red   { background: var(--red-bg);   border: 1px solid rgba(224,85,85,.3);   color: #f5c0c0; }
 
-#camMonitor{position:fixed;bottom:20px;right:20px;width:150px;z-index:90;background:var(--ink-900);border:1px solid var(--ink-700);border-radius:var(--radius);overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.4);}
-#camMonitor video{width:100%;height:112px;object-fit:cover;display:block;background:#000;transform:scaleX(-1);}
-#camMonitor canvas{position:absolute;top:0;left:0;width:100%;height:112px;transform:scaleX(-1);}
-.cam-footer{display:flex;align-items:center;gap:6px;padding:6px 10px;font-family:var(--mono);font-size:10px;color:var(--paper-dim);border-top:1px solid var(--ink-700);}
+/* ══════════════════════════════
+   GATE SCREEN
+══════════════════════════════ */
+.rules-box {
+  background: rgba(224,85,85,.06); border: 1px solid rgba(224,85,85,.25);
+  border-radius: var(--radius); padding: 16px 18px; margin: 20px 0;
+  font-size: 13px; line-height: 1.8; color: #f0ccc0;
+}
+.rules-box strong { color: var(--text); }
+.rules-box ul { padding-left: 18px; margin-top: 6px; }
+.rules-box li { margin-bottom: 3px; }
 
-#warningToast{position:fixed;top:70px;left:50%;z-index:200;transform:translateX(-50%) translateY(-12px);background:var(--alert-bg);border:1px solid var(--alert);color:#f5d7d0;padding:14px 22px;border-radius:var(--radius);font-size:14px;font-weight:600;display:flex;align-items:center;gap:12px;opacity:0;pointer-events:none;transition:opacity .25s ease,transform .25s ease;box-shadow:0 10px 30px rgba(0,0,0,.5);max-width:90vw;}
-#warningToast.show{opacity:1;transform:translateX(-50%) translateY(0);}
-#warningToast .wcount{font-family:var(--mono);background:var(--alert);color:#fff;padding:2px 8px;border-radius:2px;font-size:12px;}
+.gate-list { list-style: none; display: flex; flex-direction: column; gap: 10px; margin: 20px 0; }
+.gate-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 13px 16px; background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  font-size: 14px; transition: border-color .3s;
+}
+.gate-item.ok   { border-color: rgba(63,179,122,.3); }
+.gate-item.fail { border-color: rgba(224,85,85,.3); }
+.gate-mark {
+  width: 24px; height: 24px; border-radius: 50%;
+  border: 1.5px solid var(--border-2); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; transition: all .3s;
+}
+.gate-item.ok   .gate-mark { border-color: var(--green); background: var(--green-bg); color: var(--green); }
+.gate-item.fail .gate-mark { border-color: var(--red);   background: var(--red-bg);   color: var(--red); }
+.gate-label { flex: 1; }
+.gate-sub { color: var(--text-2); font-size: 12px; margin-top: 1px; }
 
-#fullOverlay{position:fixed;inset:0;z-index:300;background:rgba(11,18,32,.96);display:none;align-items:center;justify-content:center;padding:20px;}
-#fullOverlay .ov-card{max-width:560px;width:100%;text-align:center;background:var(--ink-900);border:1px solid var(--ink-700);border-radius:var(--radius);padding:40px 32px;max-height:90vh;overflow-y:auto;}
-.ov-icon{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:26px;font-weight:700;}
-.ov-icon.danger{background:var(--alert-bg);border:1.5px solid var(--alert);color:var(--alert);}
-.ov-icon.success{background:var(--safe-bg);border:1.5px solid var(--safe);color:var(--safe);}
-.ov-title{font-family:var(--serif);font-size:22px;margin:0 0 10px;}
-.ov-text{color:var(--paper-dim);font-size:14px;line-height:1.7;margin-bottom:8px;}
-.score-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:20px 0;}
-.score-cell{background:var(--ink-950);border:1px solid var(--ink-700);border-radius:var(--radius);padding:14px 8px;text-align:center;}
-.score-cell .sc-val{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--paper);}
-.score-cell .sc-val.gold{color:var(--gold);}
-.score-cell .sc-val.safe{color:var(--safe);}
-.score-cell .sc-label{font-size:11px;color:var(--paper-dim);margin-top:4px;}
-/* pass/fail banner */
-.result-banner{border-radius:var(--radius);padding:12px 20px;font-family:var(--serif);font-size:16px;font-weight:600;margin:12px 0;text-align:center;}
-.result-banner.pass{background:var(--safe-bg);border:1px solid var(--safe);color:var(--safe);}
-.result-banner.fail{background:var(--alert-bg);border:1px solid var(--alert);color:var(--alert);}
-.q-time-table{margin-top:20px;text-align:left;background:var(--ink-950);border:1px solid var(--ink-700);border-radius:var(--radius);overflow:hidden;max-height:220px;overflow-y:auto;}
-.q-time-table table{width:100%;border-collapse:collapse;}
-.q-time-table th{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--paper-dim);padding:8px 12px;background:var(--ink-900);border-bottom:1px solid var(--ink-700);text-align:left;}
-.q-time-table td{padding:7px 12px;font-size:12px;border-bottom:1px dashed var(--ink-800);}
-.q-time-table tr:last-child td{border-bottom:none;}
-.q-time-table .t-mono{font-family:var(--mono);color:var(--gold);}
-.q-time-table .t-ans{color:var(--safe);}
-.q-time-table .t-skip{color:var(--alert);}
-.log-box{margin-top:16px;text-align:left;background:var(--ink-950);border:1px solid var(--ink-700);border-radius:var(--radius);padding:14px 16px;font-family:var(--mono);font-size:11.5px;color:var(--paper-dim);max-height:140px;overflow-y:auto;}
-.log-box div{padding:2px 0;border-bottom:1px dashed var(--ink-800);}
-.log-box div:last-child{border-bottom:none;}
-.log-box .lt-tab{color:var(--gold);}
-.log-box .lt-face{color:#e08a6d;}
-.log-box .lt-sys{color:var(--paper-dim);}
-#savingIndicator{display:flex;align-items:center;gap:10px;color:var(--paper-dim);font-size:13px;margin-top:16px;justify-content:center;}
-.spinner{width:16px;height:16px;border-radius:50%;border:2px solid var(--ink-600);border-top-color:var(--gold);animation:spin .8s linear infinite;}
-@keyframes spin{to{transform:rotate(360deg);}}
+#gateCamPreview {
+  width: 180px; height: 135px; background: #000;
+  border-radius: var(--radius); border: 1px solid var(--border);
+  object-fit: cover; margin: 16px 0; transform: scaleX(-1);
+  display: block;
+}
 
-/* ── KaTeX color fix for dark background ── */
-.katex{color:var(--paper);font-size:1em;}
-.q-text .katex-display{margin:.4em 0;}
-.nav-row{display:flex;justify-content:space-between;align-items:center;margin-top:32px;}
-.q-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(34px,1fr));gap:6px;margin-top:20px;}
-.q-grid-item{aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;border-radius:2px;border:1px solid var(--ink-700);background:var(--ink-800);color:var(--paper-dim);cursor:pointer;position:relative;}
-.q-grid-item.answered{border-color:var(--gold-dim);color:var(--gold);}
-.q-grid-item.current{border-color:var(--gold);background:var(--gold);color:var(--ink-950);font-weight:700;}
-.q-grid-item .q-spent-dot{position:absolute;bottom:2px;right:2px;width:4px;height:4px;border-radius:50%;background:var(--accent);opacity:0;}
-.q-grid-item.has-time .q-spent-dot{opacity:1;}
+/* ══════════════════════════════
+   EXAM SCREEN
+══════════════════════════════ */
+.exam-header { margin-bottom: 20px; }
 
-/* ════ TEACHER PANEL ════ */
-#teacherOverlay{position:fixed;inset:0;z-index:400;background:rgba(11,18,32,.98);display:none;flex-direction:column;overflow:hidden;}
-#teacherOverlay.show{display:flex;}
-.teacher-topbar{display:flex;align-items:center;gap:16px;background:var(--ink-900);border-bottom:1px solid var(--gold-dim);padding:0 24px;height:56px;flex-shrink:0;}
-.teacher-topbar .t-logo{font-family:var(--mono);font-size:12px;letter-spacing:.15em;text-transform:uppercase;color:var(--gold);}
-.teacher-topbar .t-title{font-family:var(--serif);font-size:18px;color:var(--paper);margin-left:4px;}
-.teacher-topbar .t-spacer{flex:1;}
-.teacher-topbar .t-logout{background:transparent;border:1px solid var(--ink-600);color:var(--paper-dim);padding:6px 14px;border-radius:var(--radius);font-family:var(--mono);font-size:11px;cursor:pointer;transition:border-color .15s;}
-.teacher-topbar .t-logout:hover{border-color:var(--alert);color:var(--alert);}
-.teacher-body{flex:1;overflow:hidden;display:flex;flex-direction:column;padding:24px;gap:20px;max-width:1100px;width:100%;margin:0 auto;}
-#teacherLoginPanel{max-width:400px;margin:60px auto 0;background:var(--ink-900);border:1px solid var(--ink-700);border-radius:var(--radius);padding:36px 32px;text-align:center;}
-#teacherLoginPanel h2{font-family:var(--serif);font-size:22px;margin:0 0 6px;}
-#teacherLoginPanel p{color:var(--paper-dim);font-size:13px;margin-bottom:24px;}
-#teacherLoginPanel .field{text-align:left;}
-#teacherLoginError{color:var(--alert);font-size:13px;margin-top:10px;min-height:20px;}
-#teacherDashboard{display:none;flex-direction:column;gap:20px;flex:1;overflow:hidden;}
-#teacherDashboard.show{display:flex;}
-.t-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
-.t-stat-card{background:var(--ink-900);border:1px solid var(--ink-700);border-radius:var(--radius);padding:18px 16px;}
-.t-stat-val{font-family:var(--mono);font-size:26px;font-weight:700;color:var(--paper);}
-.t-stat-val.gold{color:var(--gold);}
-.t-stat-val.safe{color:var(--safe);}
-.t-stat-val.alert{color:var(--alert);}
-.t-stat-label{font-size:11px;color:var(--paper-dim);margin-top:4px;font-family:var(--mono);letter-spacing:.06em;}
-.t-controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
-.t-filter-input{background:var(--ink-800);border:1px solid var(--ink-700);border-radius:var(--radius);color:var(--paper);font-family:var(--sans);font-size:14px;padding:9px 14px;outline:none;transition:border-color .15s;min-width:200px;}
-.t-filter-input:focus{border-color:var(--gold);}
-.t-filter-select{background:var(--ink-800);border:1px solid var(--ink-700);border-radius:var(--radius);color:var(--paper);font-family:var(--sans);font-size:14px;padding:9px 14px;outline:none;cursor:pointer;}
-.t-filter-select option{background:var(--ink-800);}
-.t-table-wrap{flex:1;overflow:auto;background:var(--ink-900);border:1px solid var(--ink-700);border-radius:var(--radius);}
-table.t-table{width:100%;border-collapse:collapse;min-width:780px;}
-table.t-table thead{position:sticky;top:0;z-index:1;}
-table.t-table th{background:var(--ink-800);font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--paper-dim);padding:10px 14px;text-align:left;border-bottom:1px solid var(--ink-700);white-space:nowrap;cursor:pointer;user-select:none;}
-table.t-table th:hover{color:var(--gold);}
-table.t-table th .sort-arrow{opacity:.3;margin-left:4px;}
-table.t-table th.sorted .sort-arrow{opacity:1;color:var(--gold);}
-table.t-table td{padding:10px 14px;font-size:13px;border-bottom:1px dashed var(--ink-800);vertical-align:middle;}
-table.t-table tr:last-child td{border-bottom:none;}
-table.t-table tr:hover td{background:rgba(255,255,255,.02);}
-.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:2px;font-family:var(--mono);font-size:11px;font-weight:600;}
-.badge.pass{background:var(--safe-bg);color:var(--safe);border:1px solid var(--safe);}
-.badge.fail{background:var(--alert-bg);color:var(--alert);border:1px solid var(--alert);}
-.badge.disq{background:#1a1020;color:#c46fef;border:1px solid #7d4eaf;}
-.score-bar-cell{display:flex;align-items:center;gap:8px;}
-.score-bar{flex:1;height:6px;background:var(--ink-700);border-radius:3px;overflow:hidden;min-width:60px;}
-.score-bar-fill{height:100%;border-radius:3px;background:var(--gold);}
-.score-bar-fill.high{background:var(--safe);}
-.score-bar-fill.low{background:var(--alert);}
-.mono-cell{font-family:var(--mono);font-size:12px;color:var(--gold);}
-.t-empty{text-align:center;padding:48px;color:var(--paper-dim);font-size:14px;}
-#studentDetailModal{position:fixed;inset:0;z-index:500;background:rgba(11,18,32,.92);display:none;align-items:center;justify-content:center;padding:20px;}
-#studentDetailModal.show{display:flex;}
-.detail-card{background:var(--ink-900);border:1px solid var(--ink-700);border-radius:var(--radius);padding:32px;max-width:600px;width:100%;max-height:90vh;overflow-y:auto;}
-.detail-card h3{font-family:var(--serif);font-size:20px;margin:0 0 4px;}
-.detail-card .detail-sub{color:var(--paper-dim);font-size:13px;margin-bottom:20px;}
-.detail-q-table{width:100%;border-collapse:collapse;font-size:13px;}
-.detail-q-table th{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--paper-dim);padding:7px 10px;border-bottom:1px solid var(--ink-700);text-align:left;}
-.detail-q-table td{padding:7px 10px;border-bottom:1px dashed var(--ink-800);}
-.detail-q-table tr:last-child td{border-bottom:none;}
-footer.dev-note{max-width:880px;margin:40px auto 0;padding:16px 20px;font-family:var(--mono);font-size:11px;color:var(--ink-600);border-top:1px dashed var(--ink-700);line-height:1.7;}
+/* Question timer bar */
+.q-bar-wrap {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 14px;
+}
+.q-bar-label { font-family: var(--font-mono); font-size: 10px; color: var(--text-3); letter-spacing: .1em; white-space: nowrap; }
+.q-bar-track { flex: 1; height: 5px; background: var(--surface-3); border-radius: 3px; overflow: hidden; }
+.q-bar-fill {
+  height: 100%; border-radius: 3px;
+  background: var(--green);
+  transition: width .5s linear, background .4s ease;
+}
+.q-bar-fill.warn { background: var(--amber); }
+.q-bar-fill.crit { background: var(--red); }
+.q-bar-time {
+  font-family: var(--font-mono); font-size: 11px; color: var(--text-2);
+  min-width: 40px; text-align: right; transition: color .3s;
+}
+.q-bar-time.crit { color: var(--red); font-weight: 700; }
 
-@media(max-width:680px){
-  #app{padding:20px 14px 100px;}
-  .card{padding:22px;}
-  #statusBar{font-size:11px;padding:0 10px;}
-  .status-seg{padding:0 8px;gap:5px;}
-  #camMonitor{width:110px;bottom:12px;right:12px;}
-  #camMonitor video,#camMonitor canvas{height:82px;}
-  .reg-grid{grid-template-columns:1fr;}
-  .score-summary{grid-template-columns:repeat(3,1fr);}
-  .timer-group{gap:10px;}
-  .timer-val{font-size:14px;}
-  .t-stats{grid-template-columns:repeat(2,1fr);}
-  .teacher-body{padding:16px;}
+/* Overall progress */
+.progress-wrap { margin-bottom: 20px; }
+.progress-track { height: 3px; background: var(--surface-3); border-radius: 2px; overflow: hidden; }
+.progress-fill { height: 100%; background: var(--gold); border-radius: 2px; transition: width .4s ease; }
+.progress-meta {
+  display: flex; justify-content: space-between;
+  font-family: var(--font-mono); font-size: 10px; color: var(--text-3);
+  margin-bottom: 6px;
+}
+
+/* Topic badge */
+.topic-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 10px; border-radius: var(--radius-sm);
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .06em;
+  margin-bottom: 12px;
+}
+.topic-badge.bio  { background: var(--green-bg); border: 1px solid rgba(63,179,122,.3); color: var(--green); }
+.topic-badge.chem { background: var(--blue-bg);  border: 1px solid rgba(91,141,238,.3); color: var(--blue); }
+
+/* Question text */
+.q-text {
+  font-size: 19px; line-height: 1.65;
+  color: var(--text); margin-bottom: 18px;
+  font-weight: 500;
+}
+.katex { color: var(--text) !important; }
+
+/* Image */
+.q-img-wrap {
+  margin-bottom: 18px; border-radius: var(--radius);
+  overflow: hidden; border: 1px solid var(--border);
+  background: var(--surface-2); text-align: center;
+}
+.q-img-wrap img {
+  max-width: 100%; max-height: 320px; object-fit: contain;
+  display: block; margin: 0 auto;
+}
+.q-img-caption {
+  font-size: 11px; color: var(--text-2); font-family: var(--font-mono);
+  padding: 6px 10px; border-top: 1px solid var(--border); text-align: center;
+}
+
+/* Choices */
+.choices { display: flex; flex-direction: column; gap: 9px; }
+.choice {
+  display: flex; align-items: flex-start; gap: 13px;
+  padding: 14px 16px; background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  cursor: pointer; transition: border-color .15s, background .15s, box-shadow .15s;
+  user-select: none;
+}
+.choice:hover { border-color: var(--border-2); background: var(--surface-3); }
+.choice.selected {
+  border-color: var(--gold);
+  background: var(--gold-bg);
+  box-shadow: 0 0 0 1px var(--gold-dim);
+}
+.choice-letter {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 1.5px solid var(--border-2); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+  color: var(--text-2); transition: all .15s;
+}
+.choice.selected .choice-letter {
+  border-color: var(--gold); background: var(--gold); color: var(--bg);
+}
+.choice-text { padding-top: 4px; line-height: 1.55; font-size: 15px; }
+
+/* Nav */
+.nav-row {
+  display: flex; justify-content: space-between; align-items: center; margin-top: 24px;
+}
+
+/* Question grid */
+.q-grid-section { margin-top: 24px; }
+.q-grid-label {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--text-3); margin-bottom: 10px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.q-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(32px, 1fr)); gap: 5px;
+}
+.q-grid-item {
+  aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-size: 10px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: var(--surface-2);
+  color: var(--text-3); cursor: pointer; transition: all .15s;
+  position: relative;
+}
+.q-grid-item:hover { border-color: var(--border-2); color: var(--text); }
+.q-grid-item.answered { border-color: var(--gold-dim); color: var(--gold); }
+.q-grid-item.current  { border-color: var(--gold); background: var(--gold); color: var(--bg); font-weight: 700; }
+.q-grid-dot {
+  position: absolute; bottom: 2px; right: 2px;
+  width: 4px; height: 4px; border-radius: 50%;
+  background: var(--blue); opacity: 0; transition: opacity .2s;
+}
+.q-grid-item.has-time .q-grid-dot { opacity: 1; }
+
+.submit-row {
+  display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 20px;
+}
+.unanswered-badge {
+  font-family: var(--font-mono); font-size: 12px; color: var(--text-2);
+}
+
+/* ══════════════════════════════
+   FLOATING CAM
+══════════════════════════════ */
+#camMonitor {
+  position: fixed; bottom: 20px; right: 20px;
+  width: 148px; z-index: 100;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-lg);
+}
+#camMonitor .cam-vid-wrap { position: relative; }
+#examCamVideo {
+  width: 100%; height: 110px; object-fit: cover;
+  display: block; background: #000; transform: scaleX(-1);
+}
+#examCamCanvas {
+  position: absolute; top: 0; left: 0; width: 100%; height: 110px;
+  transform: scaleX(-1); pointer-events: none;
+}
+.cam-footer {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 10px; border-top: 1px solid var(--border);
+  font-family: var(--font-mono); font-size: 10px; color: var(--text-2);
+}
+
+/* ══════════════════════════════
+   TOAST
+══════════════════════════════ */
+#toast {
+  position: fixed; top: 60px; left: 50%; z-index: 300;
+  transform: translateX(-50%) translateY(-8px);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px 20px;
+  display: flex; align-items: center; gap: 10px;
+  font-size: 13.5px; font-weight: 600;
+  opacity: 0; pointer-events: none;
+  transition: opacity .25s, transform .25s; box-shadow: var(--shadow-lg);
+  max-width: 92vw;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+#toast.red  { border-color: rgba(224,85,85,.5); background: rgba(224,85,85,.08); color: #f5c5c5; }
+#toast.amber{ border-color: rgba(224,147,51,.5); background: rgba(224,147,51,.08); color: #f5d7a0; }
+.toast-badge {
+  font-family: var(--font-mono); font-size: 11px;
+  padding: 2px 8px; border-radius: var(--radius-sm);
+}
+#toast.red   .toast-badge { background: var(--red);   color: #fff; }
+#toast.amber .toast-badge { background: var(--amber); color: var(--bg); }
+
+/* ══════════════════════════════
+   FULLSCREEN PROMPT
+══════════════════════════════ */
+#fsPrompt {
+  position: fixed; inset: 0; z-index: 400;
+  background: rgba(8,14,26,.97);
+  display: none; align-items: center; justify-content: center; padding: 20px;
+}
+#fsPrompt .fs-card {
+  max-width: 440px; width: 100%; text-align: center;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 36px 28px; box-shadow: var(--shadow-lg);
+}
+.fs-icon { font-size: 40px; margin-bottom: 16px; }
+.fs-title { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+.fs-text { color: var(--text-2); font-size: 13.5px; margin-bottom: 24px; line-height: 1.7; }
+
+/* ══════════════════════════════
+   RESULT / DISQUALIFY OVERLAY
+══════════════════════════════ */
+#resultOverlay {
+  position: fixed; inset: 0; z-index: 350;
+  background: rgba(8,14,26,.96);
+  display: none; align-items: center; justify-content: center; padding: 20px;
+}
+#resultOverlay .ov-card {
+  max-width: 580px; width: 100%;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 36px 32px;
+  box-shadow: var(--shadow-lg); max-height: 92vh; overflow-y: auto;
+}
+.ov-icon-wrap {
+  width: 56px; height: 56px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 18px; font-size: 24px;
+}
+.ov-icon-wrap.success { background: var(--green-bg); border: 1.5px solid rgba(63,179,122,.4); color: var(--green); }
+.ov-icon-wrap.danger  { background: var(--red-bg);   border: 1.5px solid rgba(224,85,85,.4);   color: var(--red); }
+.ov-title { font-size: 22px; font-weight: 700; text-align: center; margin-bottom: 6px; }
+.ov-sub   { color: var(--text-2); font-size: 13.5px; text-align: center; margin-bottom: 20px; }
+
+.result-banner {
+  border-radius: var(--radius); padding: 11px 18px;
+  font-size: 15px; font-weight: 600; text-align: center; margin-bottom: 16px;
+}
+.result-banner.pass { background: var(--green-bg); border: 1px solid rgba(63,179,122,.3); color: var(--green); }
+.result-banner.fail { background: var(--red-bg);   border: 1px solid rgba(224,85,85,.3);   color: var(--red); }
+
+.score-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
+.score-cell {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px 8px; text-align: center;
+}
+.score-val { font-family: var(--font-mono); font-size: 20px; font-weight: 700; color: var(--text); }
+.score-val.gold  { color: var(--gold); }
+.score-val.green { color: var(--green); }
+.score-val.red   { color: var(--red); }
+.score-label { font-size: 11px; color: var(--text-2); margin-top: 3px; }
+
+/* Result detail table */
+.result-table-wrap {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden;
+  max-height: 240px; overflow-y: auto; margin-bottom: 16px;
+}
+.result-table-wrap table { width: 100%; border-collapse: collapse; }
+.result-table-wrap th {
+  background: var(--surface-3); font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--text-3);
+  padding: 8px 12px; text-align: left; position: sticky; top: 0;
+  border-bottom: 1px solid var(--border);
+}
+.result-table-wrap td {
+  padding: 7px 12px; font-size: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.result-table-wrap tr:last-child td { border-bottom: none; }
+.t-gold  { font-family: var(--font-mono); color: var(--gold); }
+.t-green { color: var(--green); }
+.t-red   { color: var(--red); }
+.t-dim   { color: var(--text-3); }
+
+/* Log box */
+.log-box {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px 14px;
+  font-family: var(--font-mono); font-size: 11px; color: var(--text-2);
+  max-height: 140px; overflow-y: auto; margin-bottom: 16px;
+}
+.log-entry { padding: 2px 0; border-bottom: 1px solid var(--border); font-size: 11px; }
+.log-entry:last-child { border-bottom: none; }
+.log-tab  { color: var(--gold); }
+.log-face { color: var(--red); }
+.log-sys  { color: var(--text-3); }
+
+/* Save indicator */
+.save-indicator {
+  display: flex; align-items: center; gap: 10px;
+  color: var(--text-2); font-size: 13px; justify-content: center; margin-top: 16px;
+}
+.spinner {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid var(--border-2); border-top-color: var(--gold);
+  animation: spin .7s linear infinite; flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ══════════════════════════════
+   TEACHER PANEL
+══════════════════════════════ */
+#teacherOverlay {
+  position: fixed; inset: 0; z-index: 500;
+  background: rgba(8,14,26,.99);
+  display: none; flex-direction: column;
+}
+#teacherOverlay.show { display: flex; }
+
+.t-bar {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 0 24px; height: 54px; flex-shrink: 0;
+}
+.t-bar-logo { font-family: var(--font-mono); font-size: 11px; letter-spacing: .15em; color: var(--gold); }
+.t-bar-title { font-size: 17px; font-weight: 700; color: var(--text); }
+.t-bar-spacer { flex: 1; }
+.t-user { font-family: var(--font-mono); font-size: 11px; color: var(--text-3); }
+.t-logout {
+  background: transparent; border: 1px solid var(--border-2); color: var(--text-2);
+  padding: 5px 12px; border-radius: var(--radius-sm);
+  font-family: var(--font-mono); font-size: 10px; transition: all .2s;
+}
+.t-logout:hover { border-color: var(--red); color: var(--red); }
+.t-close-btn {
+  background: transparent; border: 1px solid var(--border-2); color: var(--text-2);
+  padding: 5px 12px; border-radius: var(--radius-sm);
+  font-family: var(--font-mono); font-size: 10px; transition: all .2s;
+  margin-left: 4px;
+}
+.t-close-btn:hover { border-color: var(--text); color: var(--text); }
+
+.t-content { flex: 1; overflow-y: auto; }
+
+/* Login panel */
+#tLoginPanel {
+  max-width: 380px; margin: 60px auto 0;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 36px 28px; text-align: center;
+  box-shadow: var(--shadow-lg);
+}
+#tLoginPanel h2 { font-size: 22px; margin-bottom: 4px; }
+#tLoginPanel p  { color: var(--text-2); font-size: 13px; margin-bottom: 22px; }
+#tLoginPanel .field { text-align: left; margin-bottom: 12px; }
+#tLoginError { color: var(--red); font-size: 13px; margin-top: 10px; min-height: 20px; }
+
+/* Dashboard */
+#tDashboard { display: none; flex-direction: column; gap: 16px; padding: 24px; max-width: 1200px; margin: 0 auto; }
+#tDashboard.show { display: flex; }
+
+/* Tabs */
+.t-tabs {
+  display: flex; gap: 4px; background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: var(--radius); padding: 4px;
+  width: fit-content;
+}
+.t-tab {
+  padding: 7px 18px; border-radius: var(--radius-sm);
+  font-size: 13px; font-weight: 600; color: var(--text-2);
+  background: transparent; border: none; cursor: pointer; transition: all .2s;
+}
+.t-tab.active { background: var(--surface-3); color: var(--text); border: 1px solid var(--border); }
+.t-tab:hover:not(.active) { color: var(--text); }
+
+/* Stat cards */
+.t-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.t-stat {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px;
+}
+.t-stat-val { font-family: var(--font-mono); font-size: 28px; font-weight: 700; color: var(--text); line-height: 1; }
+.t-stat-val.gold  { color: var(--gold); }
+.t-stat-val.green { color: var(--green); }
+.t-stat-val.red   { color: var(--red); }
+.t-stat-label { font-size: 11px; color: var(--text-2); margin-top: 5px; }
+
+/* Controls */
+.t-controls {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.t-input {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--radius); color: var(--text);
+  font-family: var(--font-body); font-size: 13.5px; padding: 8px 12px;
+  outline: none; transition: border-color .15s; min-width: 200px;
+}
+.t-input:focus { border-color: var(--gold); }
+.t-select {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--radius); color: var(--text);
+  font-family: var(--font-body); font-size: 13.5px; padding: 8px 12px;
+  outline: none; cursor: pointer;
+}
+.t-select option { background: var(--surface-2); }
+
+/* Table */
+.t-table-wrap {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); overflow: hidden;
+}
+.t-table-scroll { overflow-x: auto; }
+table.t-table { width: 100%; border-collapse: collapse; min-width: 820px; }
+table.t-table thead { position: sticky; top: 0; z-index: 1; }
+table.t-table th {
+  background: var(--surface-2); font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--text-3);
+  padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border);
+  white-space: nowrap; cursor: pointer; user-select: none; transition: color .15s;
+}
+table.t-table th:hover { color: var(--text); }
+table.t-table th.sorted { color: var(--gold); }
+.sort-arrow { opacity: .3; margin-left: 4px; }
+th.sorted .sort-arrow { opacity: 1; }
+table.t-table td {
+  padding: 10px 14px; font-size: 13px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+table.t-table tr:last-child td { border-bottom: none; }
+table.t-table tr:hover td { background: rgba(255,255,255,.015); }
+.badge {
+  display: inline-flex; align-items: center; padding: 2px 9px;
+  border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+}
+.badge.pass { background: var(--green-bg); color: var(--green); border: 1px solid rgba(63,179,122,.3); }
+.badge.fail { background: var(--red-bg);   color: var(--red);   border: 1px solid rgba(224,85,85,.3); }
+.badge.disq { background: rgba(155,90,220,.08); color: #c06ef0; border: 1px solid rgba(155,90,220,.3); }
+.score-bar-wrap { display: flex; align-items: center; gap: 8px; }
+.score-bar { flex: 1; height: 5px; background: var(--surface-3); border-radius: 3px; overflow: hidden; min-width: 60px; }
+.score-bar-fill { height: 100%; border-radius: 3px; background: var(--gold); transition: width .4s; }
+.score-bar-fill.high { background: var(--green); }
+.score-bar-fill.low  { background: var(--red); }
+.t-mono { font-family: var(--font-mono); font-size: 12px; color: var(--gold); }
+.t-empty { text-align: center; padding: 48px; color: var(--text-2); font-size: 14px; }
+
+/* Per-question stats table */
+.q-stats-table-wrap {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); overflow: hidden;
+}
+.q-stats-table-wrap table { width: 100%; border-collapse: collapse; min-width: 600px; }
+
+/* Student detail modal */
+#detailModal {
+  position: fixed; inset: 0; z-index: 600;
+  background: rgba(8,14,26,.92);
+  display: none; align-items: center; justify-content: center; padding: 20px;
+}
+#detailModal.show { display: flex; }
+.detail-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 28px;
+  max-width: 580px; width: 100%; max-height: 88vh; overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+}
+.detail-card h3 { font-size: 20px; margin-bottom: 3px; }
+.detail-sub { color: var(--text-2); font-size: 13px; margin-bottom: 18px; }
+
+/* ══════════════════════════════
+   MISC
+══════════════════════════════ */
+.divider { height: 1px; background: var(--border); margin: 20px 0; }
+.shuffle-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--gold-bg); border: 1px solid rgba(212,168,71,.2);
+  color: var(--gold); font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: .06em; padding: 3px 10px; border-radius: var(--radius-sm);
+  margin-bottom: 14px;
+}
+.dev-note {
+  max-width: 860px; margin: 36px auto 0; padding: 14px 20px;
+  font-family: var(--font-mono); font-size: 11px; color: var(--text-3);
+  border-top: 1px solid var(--border); line-height: 1.8;
+}
+footer { display: block; }
+
+@media (max-width: 680px) {
+  #app { padding: 20px 14px 80px; }
+  .card { padding: 20px; }
+  .reg-grid { grid-template-columns: 1fr; }
+  .t-stats { grid-template-columns: 1fr 1fr; }
+  #camMonitor { width: 112px; bottom: 12px; right: 12px; }
+  #examCamVideo, #examCamCanvas { height: 84px; }
+  .score-grid { grid-template-columns: repeat(3,1fr); }
+  .t-bar { padding: 0 14px; }
+  #tDashboard { padding: 14px; }
 }
 </style>
 </head>
 <body>
 
-<!-- STATUS BAR -->
+<!-- ═══════════════════ STATUS BAR ═══════════════════ -->
 <div id="statusBar">
-  <div class="status-seg">
-    <span class="status-dot" id="camDot"></span>
-    <span>กล้อง:</span><span class="status-val" id="camStatusText">รอเริ่ม</span>
+  <div class="sb-seg">
+    <span class="sb-dot" id="camDot"></span>
+    <span>กล้อง</span><span class="sb-val" id="camText">รอเริ่ม</span>
   </div>
-  <div class="status-seg">
-    <span>สลับแท็บ:</span>
-    <span class="status-val" id="tabCountText">0</span>/<span id="tabMaxText">3</span>
+  <div class="sb-seg">
+    <span>แท็บ</span>
+    <span class="sb-val" id="tabText">0</span>/<span id="tabMax">3</span>
   </div>
-  <div class="status-seg">
-    <span>ไม่พบหน้า:</span>
-    <span class="status-val" id="faceCountText">0</span>/<span id="faceMaxText">3</span>
+  <div class="sb-seg">
+    <span>หน้า</span>
+    <span class="sb-val" id="faceText">0</span>/<span id="faceMax">3</span>
   </div>
-  <div class="status-seg" style="border:none;margin-left:auto;padding-right:0;">
-    <div class="timer-group">
-      <div class="timer-block">
-        <span class="timer-label">ข้อนี้</span>
-        <span class="timer-val" id="qTimerDisplay">--:--</span>
-      </div>
-      <div class="timer-divider"></div>
-      <div class="timer-block">
-        <span class="timer-label">ทั้งหมด</span>
-        <span class="timer-val" id="examTimer">--:--</span>
-      </div>
-      <button id="btnTeacherLogin">🔑 ครู</button>
+  <div class="sb-seg sb-timers" style="border-left:1px solid var(--border);border-right:none;">
+    <div class="sb-timer-block">
+      <span class="sb-timer-label">ข้อนี้</span>
+      <span class="sb-timer-val" id="qTimerDisplay">--:--</span>
     </div>
+    <div class="sb-divider"></div>
+    <div class="sb-timer-block">
+      <span class="sb-timer-label">รวม</span>
+      <span class="sb-timer-val" id="totalTimer">--:--</span>
+    </div>
+    <button id="btnTeacherLogin">🔑 ครู</button>
   </div>
 </div>
 
-<!-- APP -->
+<!-- ═══════════════════ STEP INDICATOR ═══════════════════ -->
+<div id="stepIndicator">
+  <div class="step active" id="step1">
+    <div class="step-circle">1</div>
+    <span class="step-label">ลงทะเบียน</span>
+  </div>
+  <div class="step" id="step2">
+    <div class="step-circle">2</div>
+    <span class="step-label">ตรวจสอบ</span>
+  </div>
+  <div class="step" id="step3">
+    <div class="step-circle">3</div>
+    <span class="step-label">ทำข้อสอบ</span>
+  </div>
+</div>
+
+<!-- ═══════════════════ APP ═══════════════════ -->
 <div id="app">
 
   <!-- REGISTRATION -->
   <section id="regScreen" class="card">
     <p class="eyebrow">ลงทะเบียนเข้าสอบ</p>
-    <h1 class="exam-title" id="regExamTitle">ชีววิทยา — ลักษณะสิ่งมีชีวิต &amp; เคมีพื้นฐาน</h1>
-    <p class="exam-meta">กรุณากรอกข้อมูลให้ครบถ้วนก่อนเริ่มทำข้อสอบ</p>
-    <div class="info-box accent">ข้อมูลของท่านจะถูกบันทึกในระบบเพื่อใช้ในการตรวจและบันทึกคะแนน กรุณากรอกข้อมูลที่ถูกต้องตรงกับทะเบียนนักเรียน</div>
+    <h1 class="page-title">ชีววิทยา — ลักษณะสิ่งมีชีวิต &amp; เคมีพื้นฐาน</h1>
+    <p class="page-sub">กรุณากรอกข้อมูลให้ครบถ้วนก่อนเริ่มทำข้อสอบ</p>
+
+    <div class="info-box blue">
+      <span class="info-icon">ℹ</span>
+      <span>ข้อมูลจะถูกบันทึกเพื่อใช้ในการตรวจและบันทึกคะแนน กรุณากรอกให้ตรงกับทะเบียนนักเรียน</span>
+    </div>
+
     <div class="reg-grid">
       <div class="field" id="fieldStudentId">
         <label>รหัสนักเรียน</label>
         <input type="text" id="inputStudentId" placeholder="เช่น 12345" maxlength="10" inputmode="numeric">
-        <span class="field-error" id="errStudentId">กรุณากรอกรหัสนักเรียน</span>
+        <span class="field-error" id="errStudentId">กรุณากรอกรหัสนักเรียน (3 ตัวขึ้นไป)</span>
       </div>
       <div class="field" id="fieldStudentName">
         <label>ชื่อ-นามสกุล</label>
@@ -335,14 +849,15 @@ footer.dev-note{max-width:880px;margin:40px auto 0;padding:16px 20px;font-family
         <label>ชั้นเรียน</label>
         <select id="inputClass">
           <option value="">-- เลือกชั้น --</option>
-          <option>ม.4/1</option><option>ม.4/2</option><option>ม.4/3</option><option>ม.4/4</option><option>ม.4/5</option><option>ม.4/6</option>
+          <option>ม.4/1</option><option>ม.4/2</option><option>ม.4/3</option>
+          <option>ม.4/4</option><option>ม.4/5</option><option>ม.4/6</option>
         </select>
         <span class="field-error" id="errClass">กรุณาเลือกชั้นเรียน</span>
       </div>
       <div class="field" id="fieldNumber">
         <label>เลขที่</label>
         <input type="number" id="inputNumber" placeholder="เช่น 12" min="1" max="50" inputmode="numeric">
-        <span class="field-error" id="errNumber">กรุณากรอกเลขที่</span>
+        <span class="field-error" id="errNumber">กรุณากรอกเลขที่ (1-50)</span>
       </div>
     </div>
     <div class="btn-row">
@@ -353,1113 +868,1337 @@ footer.dev-note{max-width:880px;margin:40px auto 0;padding:16px 20px;font-family
   <!-- GATE -->
   <section id="gateScreen" class="card hidden">
     <p class="eyebrow">ตรวจสอบก่อนเริ่ม</p>
-    <h1 class="exam-title" id="gateExamTitle">ชีววิทยา — ลักษณะสิ่งมีชีวิต &amp; เคมีพื้นฐาน</h1>
-    <p class="exam-meta" id="gateExamMeta">40 ข้อ • 50 นาที • เกณฑ์ผ่าน 60%</p>
+    <h1 class="page-title">ชีววิทยา — ลักษณะสิ่งมีชีวิต &amp; เคมีพื้นฐาน</h1>
+    <p class="page-sub">40 ข้อ • 50 นาที • เกณฑ์ผ่าน 60%</p>
+
     <div class="rules-box">
-      <strong>ข้อกำหนดการสอบ</strong>
+      <strong>⚠ ข้อกำหนดการสอบ</strong>
       <ul>
-        <li>ระบบเปิดกล้องตลอดการสอบ <strong>ไม่มีการบันทึกภาพ/วิดีโอ</strong> ประมวลผลในเครื่องเท่านั้น</li>
+        <li>ระบบเปิดกล้องตลอดการสอบ — <strong>ประมวลผลในเครื่องเท่านั้น ไม่มีการบันทึกวิดีโอ</strong></li>
         <li>ไม่พบใบหน้าต่อเนื่องเกิน <strong id="ruleFaceMax">3</strong> ครั้ง → ถูกตัดสิทธิ์ทันที</li>
         <li>สลับแท็บ/ย่อหน้าต่างเกิน <strong id="ruleTabMax">3</strong> ครั้ง → ถูกตัดสิทธิ์ทันที</li>
+        <li>ออกจากโหมดเต็มหน้าจอจะมีคำเตือนให้กลับ หากเพิกเฉยจะนับเป็นการสลับแท็บ</li>
         <li><strong>ข้อและตัวเลือกจะถูกสุ่มลำดับ</strong> แตกต่างกันในแต่ละนักเรียน</li>
-        <li>เกณฑ์ผ่าน <strong>60% ขึ้นไป (24/40 ข้อ)</strong></li>
-        <li>เมื่อเริ่มแล้วทำได้ครั้งเดียว ไม่สามารถกลับมาทำต่อได้</li>
+        <li>เกณฑ์ผ่าน <strong>60% (24/40 ข้อขึ้นไป)</strong></li>
       </ul>
     </div>
-    <ul class="gate-checklist">
-      <li class="gate-item" id="gateCamItem"><span class="mark"></span><span class="label">อนุญาตให้ใช้กล้อง<div class="sub" id="gateCamSub">ยังไม่ได้ตรวจสอบ</div></span></li>
-      <li class="gate-item" id="gateFaceItem"><span class="mark"></span><span class="label">ตรวจพบใบหน้าในเฟรม<div class="sub" id="gateFaceSub">รอกล้องพร้อม</div></span></li>
-      <li class="gate-item ok"><span class="mark"></span><span class="label">โหมดเต็มหน้าจอ<div class="sub">จะเปิดอัตโนมัติเมื่อเริ่มสอบ</div></span></li>
+
+    <ul class="gate-list">
+      <li class="gate-item" id="gateCamItem">
+        <div class="gate-mark" id="gateCamMark">—</div>
+        <div class="gate-label">
+          <div>อนุญาตให้ใช้กล้อง</div>
+          <div class="gate-sub" id="gateCamSub">ยังไม่ได้ตรวจสอบ</div>
+        </div>
+      </li>
+      <li class="gate-item" id="gateFaceItem">
+        <div class="gate-mark" id="gateFaceMark">—</div>
+        <div class="gate-label">
+          <div>ตรวจพบใบหน้าในกรอบ</div>
+          <div class="gate-sub" id="gateFaceSub">รอกล้องพร้อม</div>
+        </div>
+      </li>
+      <li class="gate-item ok">
+        <div class="gate-mark" style="border-color:var(--green);background:var(--green-bg);color:var(--green)">✓</div>
+        <div class="gate-label">
+          <div>โหมดเต็มหน้าจอ</div>
+          <div class="gate-sub">จะเปิดอัตโนมัติเมื่อเริ่มสอบ</div>
+        </div>
+      </li>
     </ul>
+
     <video id="gateCamPreview" autoplay muted playsinline></video>
+
     <div class="btn-row">
       <button class="btn btn-ghost" id="btnBack">← ย้อนกลับ</button>
-      <button class="btn btn-ghost" id="btnRequestCam">เปิดกล้อง</button>
-      <button class="btn btn-primary" id="btnStartExam" disabled>เริ่มทำข้อสอบ</button>
+      <button class="btn btn-ghost" id="btnRequestCam">📷 เปิดกล้อง</button>
+      <button class="btn btn-primary" id="btnStartExam" disabled>เริ่มทำข้อสอบ →</button>
     </div>
   </section>
 
   <!-- EXAM -->
-  <section id="examScreen">
-    <div class="q-timer-bar-wrap">
-      <span style="font-family:var(--mono);font-size:10px;color:var(--paper-dim);letter-spacing:.1em;white-space:nowrap;">เวลาต่อข้อ</span>
-      <div class="q-timer-bar-track"><div class="q-timer-bar-fill" id="qTimerBarFill" style="width:100%"></div></div>
-      <span class="q-timer-label" id="qTimerBarLabel">--</span>
-    </div>
-    <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
-    <div class="shuffle-badge">🔀 ข้อและตัวเลือกถูกสุ่มลำดับแล้ว</div>
-    <div id="topicBadge" class="topic-badge bio"></div>
-    <div class="q-counter" id="qCounter">ข้อ 1 / 40</div>
-    <p class="q-text" id="qText">...</p>
-    <div id="qImageWrap" class="q-image-wrap hidden"></div>
-    <div class="choices" id="qChoices"></div>
-    <div class="nav-row">
-      <button class="btn btn-ghost" id="btnPrev">ย้อนกลับ</button>
-      <button class="btn btn-primary" id="btnNext">ข้อถัดไป</button>
-    </div>
-    <div class="q-grid" id="qGrid"></div>
-    <div class="btn-row">
-      <button class="btn btn-danger" id="btnSubmit" style="margin-left:auto">ส่งข้อสอบ</button>
-    </div>
-  </section>
-</div>
+  <section id="examScreen" class="hidden">
 
-<!-- Floating camera -->
+    <div class="q-bar-wrap">
+      <span class="q-bar-label">เวลาต่อข้อ</span>
+      <div class="q-bar-track"><div class="q-bar-fill" id="qBarFill" style="width:100%"></div></div>
+      <span class="q-bar-time" id="qBarTime">--</span>
+    </div>
+
+    <div class="progress-wrap">
+      <div class="progress-meta">
+        <span id="qCounter">ข้อ 1 / 40</span>
+        <span id="answeredCount">ตอบแล้ว 0 ข้อ</span>
+      </div>
+      <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+    </div>
+
+    <div class="shuffle-badge">🔀 ข้อและตัวเลือกถูกสุ่มแล้ว</div>
+    <div id="topicBadge" class="topic-badge bio">🔬 ลักษณะของสิ่งมีชีวิต</div>
+
+    <p class="q-text" id="qText">...</p>
+
+    <div id="qImgWrap" class="q-img-wrap hidden">
+      <img id="qImg" src="" alt="">
+      <div class="q-img-caption" id="qImgCaption"></div>
+    </div>
+
+    <div class="choices" id="qChoices"></div>
+
+    <div class="nav-row">
+      <button class="btn btn-ghost" id="btnPrev">← ก่อนหน้า</button>
+      <button class="btn btn-ghost" id="btnNext">ถัดไป →</button>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="q-grid-section">
+      <div class="q-grid-label">
+        <span>ตารางข้อสอบ</span>
+        <span id="gridAnsweredCount" style="color:var(--gold)"></span>
+      </div>
+      <div class="q-grid" id="qGrid"></div>
+    </div>
+
+    <div class="submit-row">
+      <span class="unanswered-badge" id="unansweredBadge"></span>
+      <button class="btn btn-danger" id="btnSubmit">ส่งข้อสอบ ✓</button>
+    </div>
+
+  </section>
+
+</div><!-- #app -->
+
+<!-- Floating camera monitor -->
 <div id="camMonitor" class="hidden">
-  <div style="position:relative">
+  <div class="cam-vid-wrap">
     <video id="examCamVideo" autoplay muted playsinline></video>
     <canvas id="examCamCanvas"></canvas>
   </div>
   <div class="cam-footer">
-    <span class="status-dot live" id="monitorDot"></span>
+    <span class="sb-dot live" id="monitorDot"></span>
     <span id="monitorText">กำลังตรวจสอบ</span>
   </div>
 </div>
 
-<!-- Warning toast -->
-<div id="warningToast">
-  <span>⚠</span>
-  <span id="warningMsg">คำเตือน</span>
-  <span class="wcount" id="warningCount">1/3</span>
+<!-- Toast -->
+<div id="toast">
+  <span id="toastMsg">คำเตือน</span>
+  <span class="toast-badge" id="toastBadge">1/3</span>
 </div>
 
-<!-- Result overlay -->
-<div id="fullOverlay">
+<!-- Fullscreen re-enter prompt -->
+<div id="fsPrompt">
+  <div class="fs-card">
+    <div class="fs-icon">⛶</div>
+    <div class="fs-title">ออกจากโหมดเต็มหน้าจอ</div>
+    <div class="fs-text">กรุณากลับสู่โหมดเต็มหน้าจอเพื่อดำเนินการสอบต่อ<br>หากไม่กลับมาใน <strong id="fsCountdown">10</strong> วินาที จะถูกนับเป็นการสลับแท็บ</div>
+    <button class="btn btn-primary" id="btnReEnterFS" style="width:100%;justify-content:center;">⛶ กลับสู่เต็มหน้าจอ</button>
+  </div>
+</div>
+
+<!-- Result Overlay -->
+<div id="resultOverlay">
   <div class="ov-card">
-    <div class="ov-icon" id="ovIcon">!</div>
-    <h2 class="ov-title" id="ovTitle">หัวข้อ</h2>
-    <p class="ov-text" id="ovText">รายละเอียด</p>
-    <div id="ovResultBanner" class="hidden"></div>
-    <div class="score-summary hidden" id="ovScoreSummary"></div>
-    <div class="q-time-table hidden" id="ovQTimeTable"></div>
-    <div class="log-box hidden" id="ovLogBox"></div>
-    <div id="savingIndicator" class="hidden">
-      <div class="spinner"></div><span id="savingText">กำลังบันทึกผลการสอบ...</span>
+    <div class="ov-icon-wrap" id="ovIcon">✓</div>
+    <h2 class="ov-title" id="ovTitle">ส่งข้อสอบสำเร็จ</h2>
+    <p class="ov-sub"  id="ovSub"></p>
+    <div id="ovBanner" class="hidden"></div>
+    <div class="score-grid hidden" id="ovScoreGrid"></div>
+    <div class="result-table-wrap hidden" id="ovTable"></div>
+    <div class="log-box hidden" id="ovLog"></div>
+    <div class="save-indicator hidden" id="ovSave">
+      <div class="spinner"></div><span id="ovSaveText">กำลังบันทึก...</span>
     </div>
   </div>
 </div>
 
 <!-- TEACHER OVERLAY -->
 <div id="teacherOverlay">
-  <div class="teacher-topbar">
-    <span class="t-logo">🎓</span>
-    <span class="t-title">แผงครู — ระบบสอบออนไลน์</span>
-    <span class="t-spacer"></span>
-    <span id="teacherNameTag" style="font-family:var(--mono);font-size:12px;color:var(--paper-dim);margin-right:12px;"></span>
-    <button class="t-logout" id="btnTeacherLogout">ออกจากระบบ</button>
+  <div class="t-bar">
+    <span class="t-bar-logo">🎓</span>
+    <span class="t-bar-title">แผงครู — ระบบสอบออนไลน์</span>
+    <span class="t-bar-spacer"></span>
+    <span class="t-user" id="tUserTag"></span>
+    <button class="t-logout" id="btnTLogout">ออกจากระบบ</button>
+    <button class="t-close-btn" id="btnTClose">✕ ปิด</button>
   </div>
-  <div style="overflow-y:auto;flex:1;">
-    <div id="teacherLoginPanel">
-      <div style="font-size:36px;margin-bottom:12px;">🔐</div>
+  <div class="t-content">
+    <!-- Login -->
+    <div id="tLoginPanel">
+      <div style="font-size:40px;margin-bottom:14px">🔐</div>
       <h2>เข้าสู่ระบบครู</h2>
       <p>ใช้อีเมลและรหัสผ่านที่ลงทะเบียนไว้ใน Supabase Auth</p>
-      <div class="field" style="margin-bottom:14px;">
+      <div class="field" style="margin-bottom:12px">
         <label>อีเมล</label>
-        <input type="email" id="teacherEmail" placeholder="teacher@school.ac.th" autocomplete="username">
+        <input type="email" id="tEmail" placeholder="teacher@school.ac.th" autocomplete="username">
       </div>
-      <div class="field" style="margin-bottom:6px;">
+      <div class="field">
         <label>รหัสผ่าน</label>
-        <input type="password" id="teacherPassword" placeholder="••••••••" autocomplete="current-password">
+        <input type="password" id="tPass" placeholder="••••••••" autocomplete="current-password">
       </div>
-      <div id="teacherLoginError"></div>
-      <div class="btn-row" style="margin-top:20px;">
-        <button class="btn btn-primary" id="btnTeacherDoLogin" style="width:100%;justify-content:center;">เข้าสู่ระบบ</button>
+      <div id="tLoginError"></div>
+      <div class="btn-row" style="margin-top:18px">
+        <button class="btn btn-primary" id="btnTLogin" style="width:100%;justify-content:center">เข้าสู่ระบบ</button>
       </div>
     </div>
-    <div id="teacherDashboard" class="teacher-body">
+
+    <!-- Dashboard -->
+    <div id="tDashboard">
+      <div class="t-tabs">
+        <button class="t-tab active" onclick="switchTab('results')">📋 ผลการสอบ</button>
+        <button class="t-tab" onclick="switchTab('qstats')">📊 สถิติรายข้อ</button>
+      </div>
+
+      <!-- Stats row -->
       <div class="t-stats" id="tStats">
-        <div class="t-stat-card"><div class="t-stat-val" id="statTotal">—</div><div class="t-stat-label">ผู้เข้าสอบทั้งหมด</div></div>
-        <div class="t-stat-val gold" style="display:none" id="statAvgWrap"></div>
-        <div class="t-stat-card"><div class="t-stat-val gold" id="statAvg">—</div><div class="t-stat-label">คะแนนเฉลี่ย</div></div>
-        <div class="t-stat-card"><div class="t-stat-val safe" id="statPass">—</div><div class="t-stat-label">ผ่าน (≥60%)</div></div>
-        <div class="t-stat-card"><div class="t-stat-val alert" id="statDisq">—</div><div class="t-stat-label">ถูกตัดสิทธิ์</div></div>
+        <div class="t-stat"><div class="t-stat-val" id="statTotal">—</div><div class="t-stat-label">ผู้เข้าสอบทั้งหมด</div></div>
+        <div class="t-stat"><div class="t-stat-val gold" id="statAvg">—</div><div class="t-stat-label">คะแนนเฉลี่ย</div></div>
+        <div class="t-stat"><div class="t-stat-val green" id="statPass">—</div><div class="t-stat-label">ผ่าน (≥60%)</div></div>
+        <div class="t-stat"><div class="t-stat-val red" id="statDisq">—</div><div class="t-stat-label">ถูกตัดสิทธิ์</div></div>
       </div>
-      <div class="t-controls">
-        <input class="t-filter-input" id="tSearch" placeholder="ค้นหาชื่อ / รหัส / ชั้น..." oninput="applyFilter()">
-        <select class="t-filter-select" id="tFilterClass" onchange="applyFilter()"><option value="">ทุกชั้น</option></select>
-        <select class="t-filter-select" id="tFilterStatus" onchange="applyFilter()">
-          <option value="">ทุกสถานะ</option>
-          <option value="pass">ผ่าน</option>
-          <option value="fail">ไม่ผ่าน</option>
-          <option value="disq">ถูกตัดสิทธิ์</option>
-        </select>
-        <button class="btn btn-ghost btn-sm" onclick="loadResults()">↻ รีเฟรช</button>
-        <button class="btn btn-safe btn-sm" onclick="downloadCSV()" style="margin-left:auto">⬇ CSV</button>
-        <button class="btn btn-accent btn-sm" onclick="downloadExcel()">⬇ Excel</button>
+
+      <!-- Tab: Results -->
+      <div id="tabResults">
+        <div class="t-controls">
+          <input class="t-input" id="tSearch" placeholder="ค้นหา ชื่อ / รหัส / ชั้น..." oninput="applyFilter()">
+          <select class="t-select" id="tFilterClass" onchange="applyFilter()"><option value="">ทุกชั้น</option></select>
+          <select class="t-select" id="tFilterStatus" onchange="applyFilter()">
+            <option value="">ทุกสถานะ</option>
+            <option value="pass">ผ่าน</option>
+            <option value="fail">ไม่ผ่าน</option>
+            <option value="disq">ถูกตัดสิทธิ์</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" onclick="loadResults()">↻ รีเฟรช</button>
+          <button class="btn btn-safe btn-sm" onclick="downloadCSV()" style="margin-left:auto">⬇ CSV</button>
+          <button class="btn btn-accent btn-sm" onclick="downloadExcel()">⬇ Excel</button>
+        </div>
+        <div class="t-table-wrap">
+          <div id="tLoading" class="t-empty"><div class="spinner" style="margin:0 auto 12px"></div>กำลังโหลด...</div>
+          <div class="t-table-scroll">
+            <table class="t-table hidden" id="tTable">
+              <thead><tr>
+                <th onclick="sortBy('number')"       id="th-number">เลขที่ <span class="sort-arrow">↕</span></th>
+                <th onclick="sortBy('student_id')"   id="th-student_id">รหัส <span class="sort-arrow">↕</span></th>
+                <th onclick="sortBy('student_name')" id="th-student_name">ชื่อ-นามสกุล <span class="sort-arrow">↕</span></th>
+                <th onclick="sortBy('class')"        id="th-class">ชั้น <span class="sort-arrow">↕</span></th>
+                <th onclick="sortBy('score')"        id="th-score">คะแนน <span class="sort-arrow">↕</span></th>
+                <th onclick="sortBy('total_sec')"    id="th-total_sec">เวลาใช้ <span class="sort-arrow">↕</span></th>
+                <th>สถานะ</th>
+                <th onclick="sortBy('submitted_at')" id="th-submitted_at">ส่งเมื่อ <span class="sort-arrow">↕</span></th>
+                <th></th>
+              </tr></thead>
+              <tbody id="tBody"></tbody>
+            </table>
+          </div>
+          <div id="tEmpty" class="t-empty hidden">ไม่พบข้อมูลที่ตรงกับเงื่อนไข</div>
+        </div>
       </div>
-      <div class="t-table-wrap">
-        <div id="tLoadingRow" class="t-empty"><div class="spinner" style="margin:0 auto 12px;"></div>กำลังโหลด...</div>
-        <table class="t-table hidden" id="tTable">
-          <thead>
-            <tr>
-              <th onclick="sortBy('number')" id="th-number">เลขที่ <span class="sort-arrow">↕</span></th>
-              <th onclick="sortBy('student_id')" id="th-student_id">รหัส <span class="sort-arrow">↕</span></th>
-              <th onclick="sortBy('student_name')" id="th-student_name">ชื่อ-นามสกุล <span class="sort-arrow">↕</span></th>
-              <th onclick="sortBy('class')" id="th-class">ชั้น <span class="sort-arrow">↕</span></th>
-              <th onclick="sortBy('score')" id="th-score">คะแนน <span class="sort-arrow">↕</span></th>
-              <th onclick="sortBy('total_sec')" id="th-total_sec">เวลาใช้ <span class="sort-arrow">↕</span></th>
-              <th>สถานะ</th>
-              <th onclick="sortBy('submitted_at')" id="th-submitted_at">ส่งเมื่อ <span class="sort-arrow">↕</span></th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="tBody"></tbody>
-        </table>
-        <div id="tEmptyRow" class="t-empty hidden">ไม่พบข้อมูลที่ตรงกับเงื่อนไข</div>
+
+      <!-- Tab: Q Stats -->
+      <div id="tabQStats" class="hidden">
+        <div class="q-stats-table-wrap">
+          <div class="t-table-scroll">
+            <table class="t-table" id="qStatsTable">
+              <thead><tr>
+                <th>ข้อ</th><th>หัวข้อ</th><th>ตอบถูก</th><th>ตอบผิด</th><th>ไม่ตอบ</th><th>%ถูก</th><th>เวลาเฉลี่ย</th>
+              </tr></thead>
+              <tbody id="qStatsBody"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </div>
 
 <!-- Student detail modal -->
-<div id="studentDetailModal">
+<div id="detailModal">
   <div class="detail-card">
-    <h3 id="detailName">ชื่อนักเรียน</h3>
-    <p class="detail-sub" id="detailSub">รหัส | ชั้น เลขที่</p>
-    <div class="score-summary" id="detailScoreSummary" style="margin-bottom:16px;"></div>
-    <table class="detail-q-table" id="detailQTable">
-      <thead><tr><th>ข้อ (ต้นฉบับ)</th><th>คำตอบ</th><th>เวลา</th><th>ผล</th></tr></thead>
-      <tbody id="detailQBody"></tbody>
-    </table>
-    <div class="btn-row" style="justify-content:center;margin-top:20px;">
-      <button class="btn btn-ghost" onclick="closeDetailModal()">ปิด</button>
+    <h3 id="detailName">—</h3>
+    <p class="detail-sub" id="detailSub">—</p>
+    <div class="score-grid" id="detailScoreGrid" style="margin-bottom:16px"></div>
+    <div class="result-table-wrap">
+      <table>
+        <thead><tr><th>ข้อ</th><th>คำตอบ</th><th>เวลา</th><th>ผล</th></tr></thead>
+        <tbody id="detailBody"></tbody>
+      </table>
+    </div>
+    <div class="btn-row" style="justify-content:center;margin-top:18px">
+      <button class="btn btn-ghost" onclick="closeDetail()">ปิด</button>
     </div>
   </div>
 </div>
 
 <footer class="dev-note" id="devNote"></footer>
 
+<!-- ═══════════════════════════════════════════════
+   JAVASCRIPT
+═══════════════════════════════════════════════ -->
 <script>
-/* ════════════════════════════════════════════════════════════════
-   ระบบสอบออนไลน์ชีววิทยา
-   หัวข้อ: ลักษณะของสิ่งมีชีวิต + เคมีพื้นฐานของสิ่งมีชีวิต
-   40 ข้อ | เกณฑ์ผ่าน 60%
-   ════════════════════════════════════════════════════════════════ */
-
-/* ── 1) SUPABASE CONFIG ── */
+/* ════════════════════════════════════════════════
+   1) CONFIG
+════════════════════════════════════════════════ */
 const SUPABASE_URL  = 'https://zpsotjfeexsglbkbxlzf.supabase.co';
 const SUPABASE_ANON = 'sb_publishable_wCH6hIVAq-yNhP8eq69Nzw_3qBjec9v';
-let sbClient = null;
-try { sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON); } catch(e) {}
 
-/* ── 2) EXAM CONFIG ── */
-const CONFIG = {
-  examId:             'bio-q1',
-  examTitle:          'ชีววิทยา Q1',
-  examDurationSec:    50 * 60,    // 50 นาที
-  perQuestionSec:     45,         // 45 วินาทีต่อข้อ
-  passPercent:        60,         // เกณฑ์ผ่าน 60%
-  maxTabSwitch:       3,
-  maxFaceMissing:     3,
-  faceMissingGraceMs: 4000,
-  faceCheckIntervalMs:800,
-  requireFullscreen:  true,
-  shuffleQuestions:   true,
-  shuffleChoices:     true,
+const CFG = {
+  examId:           'bio-q1',
+  examTitle:        'ชีววิทยา Q1',
+  durationSec:      50 * 60,
+  perQSec:          45,
+  passPercent:      60,
+  maxTab:           3,
+  maxFace:          3,
+  faceMissingGrace: 4000,   // ms before counting a miss
+  faceInterval:     800,    // ms between face checks
+  fullscreenGrace:  10000,  // ms before counting fullscreen exit as tab switch
+  shuffleQ:         true,
+  shuffleC:         true,
 };
 
-/* ── 3) QUESTIONS — 40 ข้อ ──
-   id 1-20   = ลักษณะของสิ่งมีชีวิต
-   id 21-40  = เคมีพื้นฐานของสิ่งมีชีวิต
-   topic: 'bio' | 'chem'
-*/
+/* ════════════════════════════════════════════════
+   2) QUESTIONS (unchanged)
+════════════════════════════════════════════════ */
 const QUESTIONS_MASTER = [
-  { id:1, topic:'bio',
-    text:"ข้อใดเป็นลักษณะของสิ่งมีชีวิต",
-    choices:["สามารถเคลื่อนที่ได้ด้วยตัวเองเสมอ","มีการเจริญเติบโต","สังเคราะห์แสงได้ทุกชนิด","มีจำนวนเซลล์เท่ากันทุกชนิด"],
-    answerIndex:1 }, 
-  { id:2, topic:'bio',
-    text:"ข้อใดไม่ใช่ลักษณะของสิ่งมีชีวิต",
-    choices:["มีกระบวนการเมทาบอลิซึม","มีการตอบสนองต่อสิ่งเร้า", "มีการสึกกร่อนตามธรรมชาติ","มีการสืบพันธุ์"],
-    answerIndex:2 },
-  { id:3, topic:'bio',
-    text:"หน่วยพื้นฐานที่เล็กที่สุดของสิ่งมีชีวิตคือข้อใด",
-    choices:["เนื้อเยื่อ","เซลล์","อวัยวะ","ระบบอวัยวะ"],
-    answerIndex:1 },
-  { id:4, topic:'bio',
-    text:"ข้อใดไม่ใช่การเจริญเติบโตของสิ่งมีชีวิต",
-    choices:["มีการเพิ่มจำนวน (cell division)","มีการเพิ่มขนาด (cell enlargement)","มีการเปลี่ยนแปลงเพื่อทำหน้าที่บางอย่าง (differentiation)","มีการตอบสนองต่อสิ่งเร้า (Response)"],
-    answerIndex:3 },
-  { id:5, topic:'bio',
-    text:"กระบวนการในข้อใดจัดเป็นแคทาบอลิซึม (catabolism)",
-    choices:["การสังเคราะห์ด้วยแสง","การสังเคราะห์โปรตีน","การย่อยอาหาร","การสะสมไกลโคเจน"],
-    answerIndex:2 },
-  { id:6, topic:'bio',
-    text:"ข้อใดอธิบายการรักษาดุลยภาพ (Homeostasis) ได้ถูกต้องที่สุด",
-    choices:["การเพิ่มจำนวนเซลล์เพื่อซ่อมแซมร่างกาย","การรักษาสภาพแวดล้อมภายในร่างกายให้คงที่","การกำจัดสิ่งแปลกปลอมออกจากร่างกาย","การถ่ายทอดลักษณะทางพันธุกรรม"],
-    answerIndex:1 },
-  { id:7, topic:'bio',
-    text:"Physiolgy เป็นการศึกษาเกี่ยวกับอะไร",
-    choices:["การถ่ายทอดลักษณะทางพันธุกรรม","การตอบสนองต่อสิ่งเร้า","การเปลี่ยนแปลงจากอดีตสู่ปัจจุบัน","การทำงานของอวัยวะต่าง ๆ"],
-    answerIndex:3 },
-  { id:8, topic:'bio',
-    text:"การงอกใหม่ (Regeneration) ของหางตุ๊กแก จัดเป็นลักษณะของสิ่งมีชีวิตในข้อใดและแตกต่างจากการสืบพันธุ์อย่างไร",
-    image:{ url:"https://eschooltoday.com/learn/wp-content/uploads/2021/02/asexual-reproduction-regeneration-gecko.jpg", caption:"การงอกใหม่ของหางตุ๊กแก" },
-    choices:["เป็นการตอบสนองต่อสิ่งเร้า โดยมีกลไกฮอร์โมนควบคุมให้หางยาวเท่าเดิมได้","เป็นการสืบพันธุ์แบบไม่อาศัยเพศ เพราะได้ชิ้นสวนร่างกายเพิ่มขึ้น","เป็นการเจริญเติบโตและการซ่อมแซมเนื้อเยื่อ เพราะไม่ได้เพิ่มจำนวนของสิ่งมีชีวิต","เป็นการปรับตัวทางพฤติรรม เพื่อพรางตัวจากผู้ล่า"],
-    answerIndex:2 },
-  { id:9, topic:'bio',
-    text:"หลักจริยธรรม '3Rs' ในการใช้สัตว์ทดลองประกอบด้วยอะไรบ้าง",
-    choices:["Research, Result, Report", "Reuse, Recycle, Reduce", "Replacement, Reduction, Refinement", "Respect, Responsibility, Right"],
-    answerIndex:2 },
-  { id:10, topic:'bio',
-    text:"ขั้นตอนของการศึกษาวิทยาศาสตร์ต่อไปนี้ ข้อใดที่เป็นข้อที่จะนำไปสู่การสรุปผลและการศึกษาต่อไป",
-    choices:["การสังเกตและตั้งปัญหา/คำถาม","การเก็บรวบรวมข้อมูลและวิเคราะห์ผลการทดลอง","การสรุปและอภิปรายผลการทดลอง","การตั้งสมมติฐานและออกแบบการทดลอง"],
-    answerIndex:1 },
-  { id:11, topic:'bio',
-    text:"จากการทดลองนี้ ตัวแปรต้น และตัวแปรตามคือข้อใด ตามลำดับ",
-    image:{ url:"https://drive.google.com/file/d/1BDk4lxOyUqAXEfxEAbNloi897F3txeQW", caption:"การทดลองเพื่อศึกษาการเจริญเติบโตของยีสต์ในสารละลายน้ำตาล" },
-    choices:["ความเข้มข้นของสารละลายน้ำตาล, ปริมาณยีสต์","ความเข้มข้นของสารละลายน้ำตาล, ปริมาณแก๊สคาร์บอนไดออกไซด์","ปริมาณแก๊สคาร์บอนไดออกไซด์, ปริมาณยีสต์","ปริมาณสารละลายน้ำตาล, ปริมาณยีสต์"],
-    answerIndex:1 },
-  { id:12, topic:'bio',
-    text:"ในระดับการจัดระบบของสิ่งมีชีวิต (Biological Organization) ข้อใดเรียงลำดับจากระดับย่อยไปหาระดับใหญ่ได้ถูกต้อง",
-    choices:["เนื้อเยื่อ → เซลล์ → ระบบอวัยวะ → อวัยวะ → ร่างกายสิ่งมีชีวิต",
-              "เซลล์ → เนื้อเยื่อ → อวัยวะ → ระบบอวัยวะ → ร่างกายสิ่งมีชีวิต",
-              "เซลล์ → เนื้อเยื่อ → ระบบอวัยวะ → อวัยวะ → ร่างกายสิ่งมีชีวิต",
-              "เซลล์ → เนื้อเยื่อ → ร่างกายสิ่งมีชีวิต → อวัยวะ → ระบบอวัยวะ"],
-    answerIndex:1 },
-  { id:13, topic:'bio',
-    text:"นักเรียนคนหนึ่งต้องการศึกษาว่า 'ปุ๋ยคอกชนิดต่างๆ ส่งผลต่อความสูงของต้นมะลิแตกต่างกันหรือไม่' ขั้นตอนแรกที่เขาควรทำในกระบวนการวิทยาศาสตร์คืออะไร",
-    choices:["ตั้งสมมติฐานว่าปุ๋ยขี้ไก่ทำให้ต้นมะลิโตเร็วที่สุด","การระบุปัญหาให้ชัดเจนจากการสังเกต","สรุปผลการทดลองว่าปุ๋ยคอกดีกว่าปุ๋ยเคมี","ออกแบบการทดลองโดยเตรียมต้นมะลิ 20 ต้น"],
-    answerIndex:1 },
-  { id:14, topic:'bio',
-    text:"สมมติฐานทางวิทยาศาสตร์ (Scientific hypothesis) ที่ดี ควรมีลักษณะสำคัญอย่างไร",
-    choices:["ต้องสอดคล้องกับความเชื่อส่วนบุคคลของผู้วิจัยเสมอ","ต้องเขียนให้ยาวและครอบคลุมความรู้ชีววิทยาทุกเรื่อง","ต้องเป็นความจริงแท้แน่นอนที่ไม่สามารถหักล้างได้ในอนาคต","ต้องสามารถตรวจสอบได้ด้วยการทดลองหรือการสังเกต"],
-    answerIndex:3 },
-  { id:15, topic:'bio',
-    text:"การเรียงลำดับขั้นตอนของระเบียบวิธีทางวิทยาศาสตร์ (Scientific method) ในข้อใดเหมาะสมและมีประสิทธิภาพที่สุดในการค้นหาความรู้ใหม่",
-    choices:["ตั้งสมมติฐาน → ทดลอง → สังเกตและตั้งปัญหา → วิเคราะห์ข้อมูล → สรุปผล",
-            "สรุปผล → ตั้งสมมติฐาน → ทดลอง → สังเกตและตั้งปัญหา → วิเคราะห์ข้อมูล",
-            "สังเกตและตั้งปัญหา → ตั้งสมมติฐาน → ออกแบบและทดลอง → วิเคราะห์ข้อมูล → สรุปผล",
-            "สังเกตและตั้งปัญหา → วิเคราะห์ข้อมูล → สรุปผล → ตั้งสมมติฐาน → ทดลอง"],
-    answerIndex:2 },
-  { id:16, topic:'bio',
-    text:"นักวิจัยสังเกตว่า 'ต้นทานตะวันในทุ่งจะหันดอกเข้าหาทิศตะวันออกในตอนเช้าเสมอ' พฤติกรรมนี้แสดงถึงลักษณะของสิ่งมีชีวิตในข้อใดเด่นชัดที่สุด",
-    choices:["การตอบสนองต่อสิ่งเร้า","การรักษาดุลยภาพ","กระบวนการเมทาบอลิซึม","การสืบพันธุ์"],
-    answerIndex:0 },
-  { id:17, topic:'chem',
-    text:"จากภาพจงระบุจำนวนโปรตรอน นิวตรอน และเวเลนซ์อิเลกตรอนของอะตอมคาร์บอน ตามลำดับ",
-    image:{ url:"https://drive.google.com/file/d/1VFQeydu4BS9QMGKRGQaZpmkGz1u5txwZ", caption:"สัญลักษณ์ธาตุและภาพแสดงอะตอมคาร์บอน" },
-    choices:["6 4 4","6 4 6","12 6 6","6 6 4"],
-    answerIndex:3 },
-  { id:18, topic:'chem',
-    text:"จากภาพบริเวณที่ลูกศรชี้แสดงถึงอะไร",
-    image:{ url:"https://drive.google.com/file/d/19WpNVXJ0L8M9nXE-jFL1bMp7JSPYEksm"},
-    choices:["พันธะโคเวเลนต์","พันธะไฮโดรเจน","พันธะไอออนิก","พันธะระหว่างอะตอม"],
-    answerIndex:1 },
-  { id:19, topic:'chem',
-    text:"จากภาพไอออนตรงกลางเป็นไอออนชนิดใด",
-    image:{ url:"https://drive.google.com/file/d/18KLaGNT-XxPx-dJcnXvU2ErWuKcy6laf", caption:"การละลายสาร" },
-    choices:["ไอออนบวก","ไอออนลบ","ไอออนกลาง","ไอออนไนซ์"],
-    answerIndex:0 },
-  { id:20, topic:'chem',
-    text:"ข้อใดอธิบายความหมายของคำว่า 'ไฮโดรโฟบิก (Hydrophobic)' ได้ถูกต้องที่สุด",
-    choices:["คุณสมบัติของสารที่มีประจุไฟฟ้าสูง ทำให้อุ้มน้ำได้ดีมาก",
-    "ปฏิกิริยาเคมีที่โมเลกุลของน้ำแตกตัวออกเป็นไฮโดรเจนและออกซิเจน",
-    "แรงดึงดูดระหว่างโมเลกุลของน้ำกับแก้วที่ทำให้เกิดปรากฏการณ์น้ำล้นขอบ",
-    "คุณสมบัติของโมเลกุลที่ไม่มีขั้ว ซึ่งไม่สามารถสร้างพันธะไฮโดรเจนกับน้ำได้ จึงไม่ละลายน้ำ"],
-    answerIndex:3 },
-  { id:21, topic:'chem',
-    text:"ร่างกายของมนุษย์ประกอบด้วยน้ำประมาณ 60-70% คุณสมบัติข้อใดของน้ำที่ช่วยให้ร่างกายของเราสามารถรักษาอุณหภูมิให้คงที่ได้ดี แม้สภาพแวดล้อมภายนอกจะร้อนหรือหนาวอย่างรวดเร็ว",
-    choices:["น้ำมีความตึงผิวต่ำมาก ทำให้อากาศร้อนผ่านทะลุร่างกายไปได้โดยไม่สะสม",
-    "น้ำเป็นโมเลกุลไม่มีขั้ว จึงไม่นำความร้อนเข้าสู่เซลล์ชั้นใน",
-    "น้ำสามารถเยือกแข็งได้ง่ายที่อุณหภูมิห้องเพื่อกักเก็บพลังงานส่วนเกิน",
-    "น้ำมีความจุความร้อนจำเพาะสูง ทำให้ต้องใช้พลังงานมากในการเปลี่ยนอุณหภูมิ"],
-    answerIndex:3 },
-  { id:22, topic:'chem',
-    text:"จากภาพเป็นหมู่ฟังก์ชันใด",
-    image:{ url:"https://drive.google.com/file/d/1XSV0n34sKR8S0WZy-UjjYAXd5fGl-DwH"},
-    choices:["คาร์บอนิล","คาร์บอกซิล","ไฮดรอกซิล","ฟอสเฟต"],
-    answerIndex:1 },
-  { id:23, topic:'chem',
-    text:"พันธะเคมีที่เชื่อมต่อระหว่างหน่วยย่อยของโมโนแซ็กคาไรด์ (Monosaccharide) จนกลายเป็นไดแซ็กคาไรด์หรือพอลิแซ็กคาไรด์ คือพันธะประเภทใด",
-    choices:["พันธะฟอสโฟไดเอสเทอร์ (Phosphodiester bond)","พันธะเปปไทด์ (Peptide bond)","พันธะเอสเทอร์ (Ester bond)","พันธะไกลโคซิดิก (Glycosidic bond)"],
-    answerIndex:3 },
-  { id:24, topic:'chem',
-    text:"โมโนเมอร์ (Monomer) ของคาร์โบไฮเดรตคือข้อใด",
-    choices:["กรดไขมัน (Fatty acid)","กรดอะมิโน (Amino acid)","โมโนแซ็กคาไรด์ (Monosaccharide)","นิวคลีโอไทด์ (Nucleotide)"],
-    answerIndex:2 },
-  { id:25, topic:'chem',
-    text:"การทำปฏิกิริยาขจัดน้ำออก (Dehydration) เพื่อสร้างพันธะระหว่างน้ำตาลโมเลกุลเดี่ยวสองโมเลกุล จะส่งผลต่อสูตรโมเลกุลของสารอย่างไร หากนำเฮกโซส ($C_6H_{12}O_6$) สองโมเลกุลมาต่อกัน",
-    choices:["สูตรโมเลกุลจะเป็น $C_6H_{12}O_6$ เท่าเดิมเนื่องจากคาร์บอนบางส่วนระเหยไป",
-    "สูตรโมเลกุลจะเป็น $C_{12}H_{20}O_{10}$ เนื่องจากสูญเสียแก๊สออกซิเจนและไฮโดรเจนแยกกัน",
-    "สูตรโมเลกุลจะเป็น $C_{12}H_{24}O_{12}$ เนื่องจากรวมกันตรงๆ",
-    "สูตรโมเลกุลจะเป็น $C_{12}H_{22}O_{11}$ เนื่องจากสูญเสียน้ำ ($H_2O$) ไป 1 โมเลกุล"],
-    answerIndex:3 },
-  { id:26, topic:'chem',
-    text:"ปฏิกิริยาในภาพเรียกว่าอะไร",
-    image:{ url:"https://drive.google.com/file/d/13sK5okuEy7n1G-FvLi-ECl-AMN-HXsOh"},
-    choices:["dehydration","hydrolysis","combusion","neutralization"],
-    answerIndex:0 },
-  { id:27, topic:'chem',
-    text:"น้ำตาลโมเลกุลคู่ในข้อใด เกิดจากหน่วยย่อยของโมโนแซ็กคาไรด์ชนิดเดียวกันมาเชื่อมต่อกัน",
-    choices:["เซลโลไบโอส (Cellobiose)","ซูโครส (Sucrose)","มอลโทส (Maltose)","แลกโทส (Lactose)"],
-    answerIndex:2 },
-  { id:28, topic:'chem',
-    text:"โครงสร้างของพอลิแซ็กคาไรด์สะสมประเภท 'อะไมโลส' (Amylose) และ 'ไกลโคเจน' (Glycogen) มีความเหมือนหรือความแตกต่างกันอย่างไรในแง่ของโครงสร้างโมเลกุลระดับมหภาค",
-    choices:["อะไมโลสเชื่อมต่อหน่วยย่อยด้วยพันธะชนิดเบตา ส่วนไกลโคเจนเชื่อมต่อหน่วยย่อยทั้งหมดด้วยพันธะเคมีชนิดแอลฟา",
-    "อะไมโลสประกอบขึ้นมาจากหน่วยย่อยฟรักโทส ส่วนไกลโคเจนประกอบขึ้นมาจากหน่วยย่อยกลูโคสเรียงต่อกันสามมิติ",
-    "อะไมโลสเป็นพอลิเมอร์สายตรงที่ไม่มีกิ่งก้าน ส่วนไกลโคเจนเป็นพอลิเมอร์ที่มีการแตกกิ่งก้านถี่และหนาแน่นสูงมาก",
-    "อะไมโลสเป็นพอลิเมอร์ที่มีการแตกกิ่งก้านหนาแน่น ส่วนไกลโคเจนเป็นพอลิเมอร์สายตรงยาวต่อเนื่องไม่มีกิ่งก้าน"],
-    answerIndex:2 },
-  { id:29, topic:'chem',
-    text:"ภาพด้านล่างเป็นโครงสร้าง polysaccharide ชนิดหนึ่ง บริเวณที่ไฮไลท์เป็นพันธะแบบใด",
-    image:{ url:"https://drive.google.com/file/d/1G9sWPssjbLrhuZu9Cv0EYCKas2PG6m5B"},
-    choices:["พันธะแอลฟา-1,4-ไกลโคซิดิก ($\alpha$-1,4-glycosidic bond)",
-    "พันธะเบตา-1,4-ไกลโคซิดิก ($\beta$-1,4-glycosidic bond)",
-    "พันธะแอลฟา-1,6-ไกลโคซิดิก ($\alpha$-1,6-glycosidic bond)",
-    "พันธะเบตา-1,6-ไกลโคซิดิก ($\beta$-1,6-glycosidic bond)"],
-    answerIndex:1 },
-  { id:30, topic:'chem',
-    text:"กรดอะมิโน (Amino acid) ทุกชนิดที่เป็นหน่วยย่อยของโปรตีน จะมีโครงสร้างพื้นฐานที่เหมือนกันจับอยู่กับแอลฟาคาร์บอน ยกเว้นส่วนใดที่ทำให้กรดอะมิโนแต่ละชนิดมีสมบัติทางเคมีที่แตกต่างกัน",
-    choices:["หมู่คาร์บอกซิล (Carboxyl group) ที่ทำหน้าที่แสดงสมบัติเป็นกรดในสารละลาย",
-    "หมู่โซ่ข้าง (Side chain หรือ R-group) ที่มีความหลากหลายทางโครงสร้างเคมี",
-    "หมู่แอมิโน (Amino group) ที่ทำหน้าที่แสดงสมบัติเป็นเบสในสารละลาย",
-    "อะตอมของไฮโดรเจน (Hydrogen atom) ที่จับโดยตรงกับแอลฟาคาร์บอนหลัก"],
-    answerIndex:1 },
-  { id:31, topic:'chem',
-    text:"การสร้างพันธะเพปไทด์ (Peptide bond) ระหว่างกรดอะมิโนสองโมเลกุล เกิดขึ้นจากการทำปฏิกิริยา dehydration ระหว่างหมู่ฟังก์ชันใดของกรดอะมิโนทั้งสองตามลำดับ",
-    choices:["หมู่แอมิโนของกรดอะมิโนตัวแรก กับ หมู่โซ่ข้างของกรดอะมิโนตัวที่สอง",
-    "หมู่คาร์บอกซิลของกรดอะมิโนตัวแรก กับ หมู่แอมิโนของกรดอะมิโนตัวที่สอง",
-    "หมู่คาร์บอกซิลของกรดอะมิโนตัวแรก กับ หมู่คาร์บอกซิลของกรดอะมิโนตัวที่สอง",
-    "หมู่โซ่ข้างของกรดอะมิโนตัวแรก กับ หมู่แอมิโนของกรดอะมิโนตัวที่สอง"],
-    answerIndex:1 },
-  { id:32, topic:'chem',
-    text:"โปรตีนฮีโมโกลบิน (Hemoglobin) ที่ทำหน้าที่ขนส่งออกซิเจนในกระแสเลือด จัดเป็นโปรตีนที่มีโครงสร้างในระดับใด และมีลักษณะการจัดเรียงตัวของโมเลกุลอย่างไร",
-    choices:["โครงสร้างจตุรภูมิ เกิดจากสายพอลิเพปไทด์มากกว่าหนึ่งสายมาทำงานร่วมกัน",
-    "โครงสร้างทุติยภูมิ เกิดจากโครงสร้างแผ่นพับเบตาหลายแผ่นเรียงซ้อนขนานกัน",
-    "โครงสร้างปฐมภูมิ เกิดจากการเรียงลำดับกรดอะมิโนสายยาวเหยียดตรงไม่มีการม้วน",
-    "โครงสร้างตติยภูมิ เกิดจากสายพอลิเพปไทด์เพียงสายเดียวม้วนตัวเป็นก้อนกลม"],
-    answerIndex:0 },
-  { id:33, topic:'chem',
-    text:"กรดอะมิโนชนิดจำเพาะในข้อใด จัดเป็นกรดอะมิโนจำเป็น (Essential amino acid) ที่ร่างกายมนุษย์ในวัยผู้ใหญ่ไม่สามารถสังเคราะห์ขึ้นเองได้ และต้องได้รับจากการรับประทานอาหารเท่านั้น",
-    choices:["ไกลซีน (Glycine) และ อะลานีน (Alanine)",
-    "แอสพาราจีน (Asparagine) และ ไทโรซีน (Tyrosine)",
-    "ไลซีน (Lysine) และ เมทิโอนีน (Methionine)",
-    "กรดกลูตามิก (Glutamic acid) และ ซีรีน (Serine)"],
-    answerIndex:2 },
-  { id:34, topic:'chem',
-    text:"โครงสร้างของสารเคมีใดที่สามารถสร้างพันธะเปปไทด์ได้",
-    image:{ url:"https://drive.google.com/file/d/1c4lnxE9vdNMtMp4nGAiEYDC5Z4aaD7OF"},
-    choices:["A","B","C","D"],
-    answerIndex:1 },
-  { id:35, topic:'chem',
-    text:"สารที่มีโครงสร้างดังรูปเป็นสารประเภทใด",
-    image:{ url:"https://drive.google.com/file/d/10pQexwYsg5BQ2bUHORw_Esxtjn2CK-Jh"},
-    choices:["น้ำตาล pentose และ hexose","น้ำตาล pentose และ น้ำตาลกลุ่ม aldehyde","น้ำตาล pentose และ น้ำตาลกลุ่ม ketone","น้ำตาล hexose และ น้ำตาลกลุ่ม ketone"],
-    answerIndex:3 },
-  { id:36, topic:'chem',
-    text:"เพปไทด์ที่ประกอบด้วยกรดแอมิโน 4 ชนิด ชนิดละ 1 หน่วย จะสามารถมีสายเพปไทด์ที่มีลำดับกรดแอมิโนที่แตกต่างกันได้กี่แบบ",
-    choices:["8","16","24","120"],
-    answerIndex:2 },
-  { id:37, topic:'chem',
-    text:"พอลีเพปไทด์สายหนึ่งเกิดจากกรดอะมิโนจำนวน 100 โมเลกุลต่อกัน จะมีจำนวนพันธะเพปไทด์เท่าใด",
-    choices:["100","101","99","98"],
-    answerIndex:2 },
-  { id:38, topic:'chem',
-    text:"เวลาที่เรากินเนื้อไก่ เนื้อหมู หรือไข่ต้ม ร่างกายจะย่อยโปรตีนเหล่านั้นจนกลายเป็นโมเลกุลขนาดเล็กที่สุดเพื่อดูดซึมเข้าสู่ร่างกาย โมเลกุลขนาดเล็กที่เป็น 'หน่วยย่อยที่สุดของโปรตีน' นี้เรียกว่าอะไร",
-    choices:["กรดไขมัน (Fatty acid)","กรดอะมิโน (Amino acid)","โมโนแซ็กคาไรด์ (Monosaccharide)","นิวคลีโอไทด์ (Nucleotide)"],
-    answerIndex:1 },
-  { id:39, topic:'chem',
-    text:"ข้อใดเป็นตัวอย่างของพอลิแซ็กคาไรด์ (Polysaccharide)",
-    choices:["กลูโคสและฟรักโตส","ซูโครสและแลกโทส","แป้งและเซลลูโลส","กลีเซอรอลและกรดไขมัน"],
-    answerIndex:2 },
-  { id:40, topic:'chem',
-    text:"ข้อใดต่อไปนี้จัดเป็นบทบาทหน้าที่ของโปรตีนประเภท 'ป้องกัน (Defense protein)' ที่ช่วยให้ร่างกายแข็งแรงและไม่เจ็บป่วยได้ง่าย",
-    choices:["การสร้างแอนติบอดีมาดักจับเชื้อโรคที่เข้าสู่ร่างกาย","การสะสมพลังงานในรูปของไขมันใต้ผิวหนัง","การกระตุ้นให้ร่างกายรู้สึกหิวเมื่อขาดน้ำตาล","การย่อยอาหารพวกแป้งในปากโดยน้ำลาย"],
-    answerIndex:0 },
+  { id:1,  topic:'bio',  text:"ข้อใดเป็นลักษณะของสิ่งมีชีวิต", choices:["สามารถเคลื่อนที่ได้ด้วยตัวเองเสมอ","มีการเจริญเติบโต","สังเคราะห์แสงได้ทุกชนิด","มีจำนวนเซลล์เท่ากันทุกชนิด"], answerIndex:1 },
+  { id:2,  topic:'bio',  text:"ข้อใดไม่ใช่ลักษณะของสิ่งมีชีวิต", choices:["มีกระบวนการเมทาบอลิซึม","มีการตอบสนองต่อสิ่งเร้า","มีการสึกกร่อนตามธรรมชาติ","มีการสืบพันธุ์"], answerIndex:2 },
+  { id:3,  topic:'bio',  text:"หน่วยพื้นฐานที่เล็กที่สุดของสิ่งมีชีวิตคือข้อใด", choices:["เนื้อเยื่อ","เซลล์","อวัยวะ","ระบบอวัยวะ"], answerIndex:1 },
+  { id:4,  topic:'bio',  text:"ข้อใดไม่ใช่การเจริญเติบโตของสิ่งมีชีวิต", choices:["มีการเพิ่มจำนวน (cell division)","มีการเพิ่มขนาด (cell enlargement)","มีการเปลี่ยนแปลงเพื่อทำหน้าที่บางอย่าง (differentiation)","มีการตอบสนองต่อสิ่งเร้า (Response)"], answerIndex:3 },
+  { id:5,  topic:'bio',  text:"กระบวนการในข้อใดจัดเป็นแคทาบอลิซึม (catabolism)", choices:["การสังเคราะห์ด้วยแสง","การสังเคราะห์โปรตีน","การย่อยอาหาร","การสะสมไกลโคเจน"], answerIndex:2 },
+  { id:6,  topic:'bio',  text:"ข้อใดอธิบายการรักษาดุลยภาพ (Homeostasis) ได้ถูกต้องที่สุด", choices:["การเพิ่มจำนวนเซลล์เพื่อซ่อมแซมร่างกาย","การรักษาสภาพแวดล้อมภายในร่างกายให้คงที่","การกำจัดสิ่งแปลกปลอมออกจากร่างกาย","การถ่ายทอดลักษณะทางพันธุกรรม"], answerIndex:1 },
+  { id:7,  topic:'bio',  text:"Physiolgy เป็นการศึกษาเกี่ยวกับอะไร", choices:["การถ่ายทอดลักษณะทางพันธุกรรม","การตอบสนองต่อสิ่งเร้า","การเปลี่ยนแปลงจากอดีตสู่ปัจจุบัน","การทำงานของอวัยวะต่าง ๆ"], answerIndex:3 },
+  { id:8,  topic:'bio',  text:"การงอกใหม่ (Regeneration) ของหางตุ๊กแก จัดเป็นลักษณะของสิ่งมีชีวิตในข้อใดและแตกต่างจากการสืบพันธุ์อย่างไร", image:{url:"https://eschooltoday.com/learn/wp-content/uploads/2021/02/asexual-reproduction-regeneration-gecko.jpg",caption:"การงอกใหม่ของหางตุ๊กแก"}, choices:["เป็นการตอบสนองต่อสิ่งเร้า โดยมีกลไกฮอร์โมนควบคุมให้หางยาวเท่าเดิมได้","เป็นการสืบพันธุ์แบบไม่อาศัยเพศ เพราะได้ชิ้นส่วนร่างกายเพิ่มขึ้น","เป็นการเจริญเติบโตและการซ่อมแซมเนื้อเยื่อ เพราะไม่ได้เพิ่มจำนวนของสิ่งมีชีวิต","เป็นการปรับตัวทางพฤติกรรม เพื่อพรางตัวจากผู้ล่า"], answerIndex:2 },
+  { id:9,  topic:'bio',  text:"หลักจริยธรรม '3Rs' ในการใช้สัตว์ทดลองประกอบด้วยอะไรบ้าง", choices:["Research, Result, Report","Reuse, Recycle, Reduce","Replacement, Reduction, Refinement","Respect, Responsibility, Right"], answerIndex:2 },
+  { id:10, topic:'bio',  text:"ขั้นตอนของการศึกษาวิทยาศาสตร์ต่อไปนี้ ข้อใดที่จะนำไปสู่การสรุปผลและการศึกษาต่อไป", choices:["การสังเกตและตั้งปัญหา/คำถาม","การเก็บรวบรวมข้อมูลและวิเคราะห์ผลการทดลอง","การสรุปและอภิปรายผลการทดลอง","การตั้งสมมติฐานและออกแบบการทดลอง"], answerIndex:1 },
+  { id:11, topic:'bio',  text:"จากการทดลองนี้ ตัวแปรต้น และตัวแปรตามคือข้อใด ตามลำดับ", image:{url:"https://drive.google.com/file/d/1BDk4lxOyUqAXEfxEAbNloi897F3txeQW",caption:"การทดลองเพื่อศึกษาการเจริญเติบโตของยีสต์ในสารละลายน้ำตาล"}, choices:["ความเข้มข้นของสารละลายน้ำตาล, ปริมาณยีสต์","ความเข้มข้นของสารละลายน้ำตาล, ปริมาณแก๊สคาร์บอนไดออกไซด์","ปริมาณแก๊สคาร์บอนไดออกไซด์, ปริมาณยีสต์","ปริมาณสารละลายน้ำตาล, ปริมาณยีสต์"], answerIndex:1 },
+  { id:12, topic:'bio',  text:"ในระดับการจัดระบบของสิ่งมีชีวิต (Biological Organization) ข้อใดเรียงลำดับจากระดับย่อยไปหาระดับใหญ่ได้ถูกต้อง", choices:["เนื้อเยื่อ → เซลล์ → ระบบอวัยวะ → อวัยวะ → ร่างกายสิ่งมีชีวิต","เซลล์ → เนื้อเยื่อ → อวัยวะ → ระบบอวัยวะ → ร่างกายสิ่งมีชีวิต","เซลล์ → เนื้อเยื่อ → ระบบอวัยวะ → อวัยวะ → ร่างกายสิ่งมีชีวิต","เซลล์ → เนื้อเยื่อ → ร่างกายสิ่งมีชีวิต → อวัยวะ → ระบบอวัยวะ"], answerIndex:1 },
+  { id:13, topic:'bio',  text:"นักเรียนต้องการศึกษาว่า 'ปุ๋ยคอกชนิดต่างๆ ส่งผลต่อความสูงของต้นมะลิแตกต่างกันหรือไม่' ขั้นตอนแรกในกระบวนการวิทยาศาสตร์คืออะไร", choices:["ตั้งสมมติฐานว่าปุ๋ยขี้ไก่ทำให้ต้นมะลิโตเร็วที่สุด","การระบุปัญหาให้ชัดเจนจากการสังเกต","สรุปผลการทดลองว่าปุ๋ยคอกดีกว่าปุ๋ยเคมี","ออกแบบการทดลองโดยเตรียมต้นมะลิ 20 ต้น"], answerIndex:1 },
+  { id:14, topic:'bio',  text:"สมมติฐานทางวิทยาศาสตร์ (Scientific hypothesis) ที่ดี ควรมีลักษณะสำคัญอย่างไร", choices:["ต้องสอดคล้องกับความเชื่อส่วนบุคคลของผู้วิจัยเสมอ","ต้องเขียนให้ยาวและครอบคลุมความรู้ชีววิทยาทุกเรื่อง","ต้องเป็นความจริงแท้แน่นอนที่ไม่สามารถหักล้างได้","ต้องสามารถตรวจสอบได้ด้วยการทดลองหรือการสังเกต"], answerIndex:3 },
+  { id:15, topic:'bio',  text:"การเรียงลำดับขั้นตอนของระเบียบวิธีทางวิทยาศาสตร์ (Scientific method) ในข้อใดเหมาะสมที่สุด", choices:["ตั้งสมมติฐาน → ทดลอง → สังเกตและตั้งปัญหา → วิเคราะห์ → สรุป","สรุป → ตั้งสมมติฐาน → ทดลอง → สังเกตและตั้งปัญหา → วิเคราะห์","สังเกตและตั้งปัญหา → ตั้งสมมติฐาน → ออกแบบและทดลอง → วิเคราะห์ → สรุป","สังเกตและตั้งปัญหา → วิเคราะห์ → สรุป → ตั้งสมมติฐาน → ทดลอง"], answerIndex:2 },
+  { id:16, topic:'bio',  text:"นักวิจัยสังเกตว่า 'ต้นทานตะวันในทุ่งจะหันดอกเข้าหาทิศตะวันออกในตอนเช้าเสมอ' พฤติกรรมนี้แสดงถึงลักษณะของสิ่งมีชีวิตในข้อใดเด่นชัดที่สุด", choices:["การตอบสนองต่อสิ่งเร้า","การรักษาดุลยภาพ","กระบวนการเมทาบอลิซึม","การสืบพันธุ์"], answerIndex:0 },
+  { id:17, topic:'chem', text:"จากภาพจงระบุจำนวนโปรตรอน นิวตรอน และเวเลนซ์อิเลกตรอนของอะตอมคาร์บอน ตามลำดับ", image:{url:"https://drive.google.com/file/d/1VFQeydu4BS9QMGKRGQaZpmkGz1u5txwZ",caption:"สัญลักษณ์ธาตุและภาพแสดงอะตอมคาร์บอน"}, choices:["6 4 4","6 4 6","12 6 6","6 6 4"], answerIndex:3 },
+  { id:18, topic:'chem', text:"จากภาพบริเวณที่ลูกศรชี้แสดงถึงอะไร", image:{url:"https://drive.google.com/file/d/19WpNVXJ0L8M9nXE-jFL1bMp7JSPYEksm"}, choices:["พันธะโคเวเลนต์","พันธะไฮโดรเจน","พันธะไอออนิก","พันธะระหว่างอะตอม"], answerIndex:1 },
+  { id:19, topic:'chem', text:"จากภาพไอออนตรงกลางเป็นไอออนชนิดใด", image:{url:"https://drive.google.com/file/d/18KLaGNT-XxPx-dJcnXvU2ErWuKcy6laf",caption:"การละลายสาร"}, choices:["ไอออนบวก","ไอออนลบ","ไอออนกลาง","ไอออนไนซ์"], answerIndex:0 },
+  { id:20, topic:'chem', text:"ข้อใดอธิบายความหมายของคำว่า 'ไฮโดรโฟบิก (Hydrophobic)' ได้ถูกต้องที่สุด", choices:["คุณสมบัติของสารที่มีประจุไฟฟ้าสูง ทำให้อุ้มน้ำได้ดีมาก","ปฏิกิริยาเคมีที่โมเลกุลของน้ำแตกตัวออกเป็นไฮโดรเจนและออกซิเจน","แรงดึงดูดระหว่างโมเลกุลของน้ำกับแก้วที่ทำให้เกิดปรากฏการณ์น้ำล้นขอบ","คุณสมบัติของโมเลกุลที่ไม่มีขั้ว ซึ่งไม่สามารถสร้างพันธะไฮโดรเจนกับน้ำได้ จึงไม่ละลายน้ำ"], answerIndex:3 },
+  { id:21, topic:'chem', text:"ร่างกายของมนุษย์ประกอบด้วยน้ำประมาณ 60-70% คุณสมบัติข้อใดของน้ำที่ช่วยให้ร่างกายรักษาอุณหภูมิให้คงที่ได้ดี", choices:["น้ำมีความตึงผิวต่ำมาก ทำให้อากาศร้อนผ่านทะลุร่างกายไปได้","น้ำเป็นโมเลกุลไม่มีขั้ว จึงไม่นำความร้อนเข้าสู่เซลล์ชั้นใน","น้ำสามารถเยือกแข็งได้ง่ายที่อุณหภูมิห้องเพื่อกักเก็บพลังงานส่วนเกิน","น้ำมีความจุความร้อนจำเพาะสูง ทำให้ต้องใช้พลังงานมากในการเปลี่ยนอุณหภูมิ"], answerIndex:3 },
+  { id:22, topic:'chem', text:"จากภาพเป็นหมู่ฟังก์ชันใด", image:{url:"https://drive.google.com/file/d/1XSV0n34sKR8S0WZy-UjjYAXd5fGl-DwH"}, choices:["คาร์บอนิล","คาร์บอกซิล","ไฮดรอกซิล","ฟอสเฟต"], answerIndex:1 },
+  { id:23, topic:'chem', text:"พันธะเคมีที่เชื่อมต่อระหว่างหน่วยย่อยของโมโนแซ็กคาไรด์จนกลายเป็นไดแซ็กคาไรด์หรือพอลิแซ็กคาไรด์ คือพันธะประเภทใด", choices:["พันธะฟอสโฟไดเอสเทอร์ (Phosphodiester bond)","พันธะเปปไทด์ (Peptide bond)","พันธะเอสเทอร์ (Ester bond)","พันธะไกลโคซิดิก (Glycosidic bond)"], answerIndex:3 },
+  { id:24, topic:'chem', text:"โมโนเมอร์ (Monomer) ของคาร์โบไฮเดรตคือข้อใด", choices:["กรดไขมัน (Fatty acid)","กรดอะมิโน (Amino acid)","โมโนแซ็กคาไรด์ (Monosaccharide)","นิวคลีโอไทด์ (Nucleotide)"], answerIndex:2 },
+  { id:25, topic:'chem', text:"การทำปฏิกิริยาขจัดน้ำออก (Dehydration) ระหว่างเฮกโซส ($C_6H_{12}O_6$) สองโมเลกุล จะได้สูตรโมเลกุลของผลิตภัณฑ์เป็นอะไร", choices:["$C_6H_{12}O_6$ เท่าเดิมเนื่องจากคาร์บอนบางส่วนระเหยไป","$C_{12}H_{20}O_{10}$ เนื่องจากสูญเสียแก๊สออกซิเจนและไฮโดรเจนแยกกัน","$C_{12}H_{24}O_{12}$ เนื่องจากรวมกันตรงๆ","$C_{12}H_{22}O_{11}$ เนื่องจากสูญเสียน้ำ ($H_2O$) ไป 1 โมเลกุล"], answerIndex:3 },
+  { id:26, topic:'chem', text:"ปฏิกิริยาในภาพเรียกว่าอะไร", image:{url:"https://drive.google.com/file/d/13sK5okuEy7n1G-FvLi-ECl-AMN-HXsOh"}, choices:["dehydration","hydrolysis","combusion","neutralization"], answerIndex:0 },
+  { id:27, topic:'chem', text:"น้ำตาลโมเลกุลคู่ในข้อใด เกิดจากหน่วยย่อยโมโนแซ็กคาไรด์ชนิดเดียวกันมาเชื่อมต่อกัน", choices:["เซลโลไบโอส (Cellobiose)","ซูโครส (Sucrose)","มอลโทส (Maltose)","แลกโทส (Lactose)"], answerIndex:2 },
+  { id:28, topic:'chem', text:"โครงสร้างของ 'อะไมโลส' (Amylose) และ 'ไกลโคเจน' (Glycogen) แตกต่างกันอย่างไรในแง่ของโครงสร้างโมเลกุล", choices:["อะไมโลสเชื่อมด้วยพันธะเบตา ส่วนไกลโคเจนเชื่อมด้วยพันธะแอลฟาทั้งหมด","อะไมโลสประกอบจากฟรักโทส ส่วนไกลโคเจนประกอบจากกลูโคส","อะไมโลสเป็นพอลิเมอร์สายตรงไม่มีกิ่ง ส่วนไกลโคเจนมีกิ่งก้านถี่และหนาแน่น","อะไมโลสมีกิ่งก้านหนาแน่น ส่วนไกลโคเจนเป็นสายตรงยาวต่อเนื่อง"], answerIndex:2 },
+  { id:29, topic:'chem', text:"ภาพด้านล่างเป็นโครงสร้าง polysaccharide ชนิดหนึ่ง บริเวณที่ไฮไลท์เป็นพันธะแบบใด", image:{url:"https://drive.google.com/file/d/1G9sWPssjbLrhuZu9Cv0EYCKas2PG6m5B"}, choices:["พันธะแอลฟา-1,4-ไกลโคซิดิก ($\\alpha$-1,4-glycosidic bond)","พันธะเบตา-1,4-ไกลโคซิดิก ($\\beta$-1,4-glycosidic bond)","พันธะแอลฟา-1,6-ไกลโคซิดิก ($\\alpha$-1,6-glycosidic bond)","พันธะเบตา-1,6-ไกลโคซิดิก ($\\beta$-1,6-glycosidic bond)"], answerIndex:1 },
+  { id:30, topic:'chem', text:"กรดอะมิโนแต่ละชนิดมีสมบัติทางเคมีแตกต่างกันเพราะส่วนใดที่แตกต่างกัน", choices:["หมู่คาร์บอกซิล (Carboxyl group)","หมู่โซ่ข้าง (Side chain หรือ R-group)","หมู่แอมิโน (Amino group)","อะตอมของไฮโดรเจนที่จับโดยตรงกับแอลฟาคาร์บอน"], answerIndex:1 },
+  { id:31, topic:'chem', text:"การสร้างพันธะเปปไทด์ (Peptide bond) ระหว่างกรดอะมิโนสองโมเลกุล เกิดจากปฏิกิริยา dehydration ระหว่างหมู่ฟังก์ชันใดของกรดอะมิโนทั้งสอง", choices:["หมู่แอมิโนของตัวแรก กับ หมู่โซ่ข้างของตัวที่สอง","หมู่คาร์บอกซิลของตัวแรก กับ หมู่แอมิโนของตัวที่สอง","หมู่คาร์บอกซิลของตัวแรก กับ หมู่คาร์บอกซิลของตัวที่สอง","หมู่โซ่ข้างของตัวแรก กับ หมู่แอมิโนของตัวที่สอง"], answerIndex:1 },
+  { id:32, topic:'chem', text:"โปรตีนฮีโมโกลบิน (Hemoglobin) จัดเป็นโปรตีนที่มีโครงสร้างในระดับใด", choices:["โครงสร้างจตุรภูมิ เกิดจากสายพอลิเพปไทด์มากกว่าหนึ่งสายมาทำงานร่วมกัน","โครงสร้างทุติยภูมิ เกิดจากโครงสร้างแผ่นพับเบตาหลายแผ่นเรียงซ้อน","โครงสร้างปฐมภูมิ เกิดจากการเรียงลำดับกรดอะมิโนสายยาวเหยียดตรง","โครงสร้างตติยภูมิ เกิดจากสายพอลิเพปไทด์เพียงสายเดียวม้วนตัวเป็นก้อนกลม"], answerIndex:0 },
+  { id:33, topic:'chem', text:"กรดอะมิโนชนิดใดจัดเป็นกรดอะมิโนจำเป็น (Essential amino acid) ที่ร่างกายมนุษย์ในวัยผู้ใหญ่ไม่สามารถสังเคราะห์ได้เอง", choices:["ไกลซีน (Glycine) และ อะลานีน (Alanine)","แอสพาราจีน (Asparagine) และ ไทโรซีน (Tyrosine)","ไลซีน (Lysine) และ เมทิโอนีน (Methionine)","กรดกลูตามิก (Glutamic acid) และ ซีรีน (Serine)"], answerIndex:2 },
+  { id:34, topic:'chem', text:"โครงสร้างของสารเคมีใดที่สามารถสร้างพันธะเปปไทด์ได้", image:{url:"https://drive.google.com/file/d/1c4lnxE9vdNMtMp4nGAiEYDC5Z4aaD7OF"}, choices:["A","B","C","D"], answerIndex:1 },
+  { id:35, topic:'chem', text:"สารที่มีโครงสร้างดังรูปเป็นสารประเภทใด", image:{url:"https://drive.google.com/file/d/10pQexwYsg5BQ2bUHORw_Esxtjn2CK-Jh"}, choices:["น้ำตาล pentose และ hexose","น้ำตาล pentose และ น้ำตาลกลุ่ม aldehyde","น้ำตาล pentose และ น้ำตาลกลุ่ม ketone","น้ำตาล hexose และ น้ำตาลกลุ่ม ketone"], answerIndex:3 },
+  { id:36, topic:'chem', text:"เพปไทด์ที่ประกอบด้วยกรดแอมิโน 4 ชนิด ชนิดละ 1 หน่วย จะสามารถมีลำดับกรดแอมิโนที่แตกต่างกันได้กี่แบบ", choices:["8","16","24","120"], answerIndex:2 },
+  { id:37, topic:'chem', text:"พอลีเพปไทด์สายหนึ่งเกิดจากกรดอะมิโนจำนวน 100 โมเลกุลต่อกัน จะมีจำนวนพันธะเพปไทด์เท่าใด", choices:["100","101","99","98"], answerIndex:2 },
+  { id:38, topic:'chem', text:"'หน่วยย่อยที่สุดของโปรตีน' ที่ร่างกายดูดซึมเข้าสู่ร่างกายเรียกว่าอะไร", choices:["กรดไขมัน (Fatty acid)","กรดอะมิโน (Amino acid)","โมโนแซ็กคาไรด์ (Monosaccharide)","นิวคลีโอไทด์ (Nucleotide)"], answerIndex:1 },
+  { id:39, topic:'chem', text:"ข้อใดเป็นตัวอย่างของพอลิแซ็กคาไรด์ (Polysaccharide)", choices:["กลูโคสและฟรักโตส","ซูโครสและแลกโทส","แป้งและเซลลูโลส","กลีเซอรอลและกรดไขมัน"], answerIndex:2 },
+  { id:40, topic:'chem', text:"ข้อใดจัดเป็นบทบาทหน้าที่ของโปรตีนประเภท 'ป้องกัน (Defense protein)'", choices:["การสร้างแอนติบอดีมาดักจับเชื้อโรคที่เข้าสู่ร่างกาย","การสะสมพลังงานในรูปของไขมันใต้ผิวหนัง","การกระตุ้นให้ร่างกายรู้สึกหิวเมื่อขาดน้ำตาล","การย่อยอาหารพวกแป้งในปากโดยน้ำลาย"], answerIndex:0 },
 ];
 
-/* ════ SHUFFLE ════ */
+/* ════════════════════════════════════════════════
+   3) UTILITIES
+════════════════════════════════════════════════ */
+const $ = id => document.getElementById(id);
+const fmtSec = s => `${Math.floor(s/60).toString().padStart(2,'0')}:${(Math.abs(s)%60).toString().padStart(2,'0')}`;
+
 function shuffle(arr) {
   const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
+  for (let i = a.length-1; i > 0; i--) {
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]] = [a[j],a[i]];
   }
   return a;
 }
-function buildShuffledExam() {
-  let order = QUESTIONS_MASTER.map((_, i) => i);
-  if (CONFIG.shuffleQuestions) order = shuffle(order);
-  return order.map(origIdx => {
-    const q = QUESTIONS_MASTER[origIdx];
-    let choiceOrder = q.choices.map((_, i) => i);
-    if (CONFIG.shuffleChoices) choiceOrder = shuffle(choiceOrder);
-    const shuffledChoices = choiceOrder.map(op => q.choices[op]);
-    const newAns = choiceOrder.indexOf(q.answerIndex);
-    return { id:q.id, originalId:q.id, topic:q.topic, text:q.text, image:q.image||null,
-             choices:shuffledChoices, answerIndex:newAns, choiceMap:choiceOrder };
+
+function buildShuffled() {
+  let order = QUESTIONS_MASTER.map((_,i)=>i);
+  if (CFG.shuffleQ) order = shuffle(order);
+  return order.map(oi => {
+    const q = QUESTIONS_MASTER[oi];
+    let co = q.choices.map((_,i)=>i);
+    if (CFG.shuffleC) co = shuffle(co);
+    return { ...q, choices: co.map(i=>q.choices[i]), answerIndex: co.indexOf(q.answerIndex), choiceMap: co };
   });
 }
+
+function renderMath(el) {
+  if (typeof renderMathInElement === 'function') {
+    try {
+      renderMathInElement(el, {
+        delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],
+        throwOnError:false
+      });
+    } catch(e){}
+  }
+}
+
+/* ════════════════════════════════════════════════
+   4) STATE
+════════════════════════════════════════════════ */
 let QUESTIONS = [];
-
-/* ── STATE ── */
-const state = {
-  student:{id:'',name:'',class:'',number:''},
-  camStream:null, faceModelReady:false,
-  examStarted:false, examEnded:false, current:0, answers:{},
-  remainingSec:CONFIG.examDurationSec, timerInterval:null, examStartTime:null,
-  qStartTime:null, qTimeSpent:{}, qTimerRAF:null,
-  tabSwitchCount:0, faceMissingCount:0,
-  faceMissingTimerStart:null, faceCurrentlyMissing:false, faceDetectInterval:null,
-  eventLog:[],
+const S = {
+  student:       {id:'',name:'',class:'',number:0},
+  camStream:     null,
+  faceReady:     false,
+  started:       false,
+  ended:         false,
+  current:       0,
+  answers:       {},
+  remainSec:     CFG.durationSec,
+  totalInterval: null,
+  startTime:     null,
+  qStartTime:    null,
+  qSpent:        {},
+  rafId:         null,
+  tabCount:      0,
+  faceCount:     0,
+  faceMissStart: null,
+  faceMissing:   false,
+  faceInterval:  null,
+  fsExitTime:    null,
+  fsCountdownId: null,
+  log:           [],
 };
-function logEvent(type, message) {
-  const entry = {type, message, timestamp:new Date().toISOString()};
-  state.eventLog.push(entry);
-  try { localStorage.setItem('exam_event_log', JSON.stringify(state.eventLog)); } catch(e) {}
-  return entry;
-}
-const $ = id => document.getElementById(id);
 
-/* ── INIT ── */
-function initApp() {
-  $('tabMaxText').textContent  = CONFIG.maxTabSwitch;
-  $('faceMaxText').textContent = CONFIG.maxFaceMissing;
-  $('ruleFaceMax').textContent = CONFIG.maxFaceMissing;
-  $('ruleTabMax').textContent  = CONFIG.maxTabSwitch;
-  const ok = !SUPABASE_URL.includes('YOUR_PROJECT');
-  $('devNote').innerHTML = ok
-    ? `Supabase: <span style="color:var(--safe)">${SUPABASE_URL}</span> | exam: ${CONFIG.examId} | ${QUESTIONS_MASTER.length} ข้อ | ผ่าน ${CONFIG.passPercent}%`
-    : `<span style="color:var(--alert)">⚠ ยังไม่ได้ตั้งค่า Supabase</span>`;
-  logEvent('system','โหลดหน้าสอบสำเร็จ');
+function logEv(type, msg) {
+  S.log.push({ type, msg, ts: new Date().toISOString() });
 }
 
-/* ── REGISTRATION ── */
-function setFieldError(fieldId, show) {
-  const el=$(fieldId); if(!el) return;
-  if(show) el.classList.add('has-error'); else el.classList.remove('has-error');
+/* ════════════════════════════════════════════════
+   5) SUPABASE
+════════════════════════════════════════════════ */
+let sb = null;
+try { sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON); } catch(e){}
+const sbOk = () => sb && !SUPABASE_URL.includes('YOUR_PROJECT');
+
+/* ════════════════════════════════════════════════
+   6) STEP INDICATOR
+════════════════════════════════════════════════ */
+function setStep(n) {
+  [1,2,3].forEach(i => {
+    const el = $('step'+i);
+    el.classList.toggle('active', i===n);
+    el.classList.toggle('done',   i<n);
+    const circle = el.querySelector('.step-circle');
+    if (i<n) circle.textContent = '✓';
+    else circle.textContent = i;
+  });
+}
+
+/* ════════════════════════════════════════════════
+   7) REGISTRATION
+════════════════════════════════════════════════ */
+function setErr(fieldId, show) {
+  const el = $(fieldId);
+  if (!el) return;
+  el.classList.toggle('has-error', show);
 }
 function validateReg() {
-  const sid=$('inputStudentId').value.trim(), sname=$('inputStudentName').value.trim(),
-        scls=$('inputClass').value, snum=$('inputNumber').value.trim();
-  let ok=true;
-  setFieldError('fieldStudentId', sid.length<3);   if(sid.length<3) ok=false;
-  setFieldError('fieldStudentName', sname.length<2); if(sname.length<2) ok=false;
-  setFieldError('fieldClass', scls==='');            if(scls==='') ok=false;
-  setFieldError('fieldNumber', !snum||+snum<=0||+snum>50); if(!snum||+snum<=0||+snum>50) ok=false;
+  const sid   = $('inputStudentId').value.trim();
+  const sname = $('inputStudentName').value.trim();
+  const scls  = $('inputClass').value;
+  const snum  = $('inputNumber').value.trim();
+  let ok = true;
+  setErr('fieldStudentId',   sid.length<3);   if(sid.length<3)  ok=false;
+  setErr('fieldStudentName', sname.length<2);  if(sname.length<2) ok=false;
+  setErr('fieldClass',       !scls);            if(!scls)         ok=false;
+  setErr('fieldNumber',      !snum||+snum<1||+snum>50); if(!snum||+snum<1||+snum>50) ok=false;
   return ok;
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-  $('btnRegNext').addEventListener('click', function() {
-    if(!validateReg()) return;
-    state.student = { id:$('inputStudentId').value.trim(), name:$('inputStudentName').value.trim(),
-                      class:$('inputClass').value, number:parseInt($('inputNumber').value) };
-    logEvent('system','ลงทะเบียน: '+state.student.name);
-    $('regScreen').classList.add('hidden');
-    $('gateScreen').classList.remove('hidden');
-  });
-  $('btnBack').addEventListener('click', function() {
-    $('gateScreen').classList.add('hidden'); $('regScreen').classList.remove('hidden');
-  });
-  $('btnRequestCam').addEventListener('click', requestCamera);
-  $('btnStartExam').addEventListener('click', startExam);
-});
-
-/* ── CAMERA ── */
+/* ════════════════════════════════════════════════
+   8) CAMERA & FACE
+════════════════════════════════════════════════ */
 async function requestCamera() {
-  const camItem=$('gateCamItem'), camSub=$('gateCamSub');
+  const camItem = $('gateCamItem'), camSub = $('gateCamSub');
   try {
-    state.camStream = await navigator.mediaDevices.getUserMedia({video:{width:320,height:240,facingMode:'user'},audio:false});
-    $('gateCamPreview').srcObject = state.camStream;
-    camItem.classList.add('ok'); camItem.classList.remove('fail');
+    S.camStream = await navigator.mediaDevices.getUserMedia({video:{width:320,height:240,facingMode:'user'},audio:false});
+    $('gateCamPreview').srcObject = S.camStream;
+    camItem.classList.add('ok');
+    $('gateCamMark').textContent = '✓';
     camSub.textContent = 'อนุญาตแล้ว';
-    $('camDot').className='status-dot live'; $('camStatusText').textContent='พร้อมใช้งาน';
-    logEvent('system','อนุญาตกล้องสำเร็จ');
-    await loadFaceModel(); startGateFaceCheck();
+    $('camDot').className = 'sb-dot live'; $('camText').textContent = 'พร้อม';
+    logEv('system','กล้องพร้อม');
+    await loadFaceModel();
+    startGateFaceCheck();
   } catch(err) {
-    camItem.classList.add('fail'); camItem.classList.remove('ok');
-    camSub.textContent = 'ถูกปฏิเสธ — กรุณาอนุญาตกล้องแล้วลองใหม่';
-    $('camStatusText').textContent='ถูกปฏิเสธ';
-    logEvent('system','ปฏิเสธกล้อง:'+err.message);
+    camItem.classList.add('fail');
+    $('gateCamMark').textContent = '!';
+    camSub.textContent = 'ถูกปฏิเสธ — กรุณาอนุญาตแล้วลองใหม่';
+    logEv('system','ปฏิเสธกล้อง:'+err.message);
   }
-  evaluateGateReady();
+  evalGate();
 }
 
-/* ── FACE MODEL ── */
-async function waitForFaceApi(maxMs) {
-  const start=Date.now();
-  return new Promise((resolve,reject)=>{
-    function check() {
-      if(typeof faceapi!=='undefined'&&faceapi.nets){resolve();return;}
-      if(Date.now()-start>maxMs){reject(new Error('faceapi timeout'));return;}
-      setTimeout(check,100);
-    }
-    check();
+async function waitFaceApi(maxMs=10000) {
+  const t = Date.now();
+  return new Promise((res,rej) => {
+    const chk = () => {
+      if (typeof faceapi !== 'undefined' && faceapi.nets) { res(); return; }
+      if (Date.now()-t > maxMs) { rej(new Error('faceapi timeout')); return; }
+      setTimeout(chk, 100);
+    };
+    chk();
   });
 }
+
 async function loadFaceModel() {
-  if(state.faceModelReady) return;
+  if (S.faceReady) return;
   try {
-    await waitForFaceApi(10000);
+    await waitFaceApi();
     await faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/');
-    state.faceModelReady=true; logEvent('system','โหลดโมเดลใบหน้าสำเร็จ');
+    S.faceReady = true;
+    logEv('system','โหลดโมเดลใบหน้าสำเร็จ');
   } catch(err) {
-    logEvent('system','โหลดโมเดลล้มเหลว:'+err.message);
-    if($('gateFaceSub')) $('gateFaceSub').textContent='โหลดโมเดลล้มเหลว';
+    logEv('system','โหลดโมเดลล้มเหลว:'+err.message);
+    $('gateFaceSub').textContent = 'โหลดโมเดลล้มเหลว — ข้ามการตรวจใบหน้า';
+    // Allow exam start even without face model
+    $('gateFaceItem').classList.add('ok');
+    $('gateFaceMark').textContent = '✓';
+    S.faceReady = false;
+    evalGate();
   }
 }
-let gateFaceInterval=null;
+
+let gateFaceInt = null;
 function startGateFaceCheck() {
-  if(gateFaceInterval) clearInterval(gateFaceInterval);
-  gateFaceInterval = setInterval(async()=>{
-    if(!state.faceModelReady||$('gateScreen').classList.contains('hidden')) return;
-    const det = await faceapi.detectSingleFace($('gateCamPreview'),new faceapi.TinyFaceDetectorOptions());
-    const fi=$('gateFaceItem'), fs=$('gateFaceSub');
-    if(det){fi.classList.add('ok');fi.classList.remove('fail');fs.textContent='ตรวจพบใบหน้าชัดเจน';}
-    else   {fi.classList.add('fail');fi.classList.remove('ok');fs.textContent='ยังไม่พบใบหน้า';}
-    evaluateGateReady();
-  },700);
+  clearInterval(gateFaceInt);
+  gateFaceInt = setInterval(async () => {
+    if (!S.faceReady || $('gateScreen').classList.contains('hidden')) return;
+    try {
+      const det = await faceapi.detectSingleFace($('gateCamPreview'), new faceapi.TinyFaceDetectorOptions());
+      const fi = $('gateFaceItem'), fs = $('gateFaceSub');
+      if (det) {
+        fi.classList.add('ok'); fi.classList.remove('fail');
+        $('gateFaceMark').textContent = '✓';
+        fs.textContent = 'ตรวจพบใบหน้าชัดเจน';
+      } else {
+        fi.classList.remove('ok'); fi.classList.add('fail');
+        $('gateFaceMark').textContent = '!';
+        fs.textContent = 'ยังไม่พบใบหน้า — กรุณาให้ใบหน้าอยู่ในกรอบ';
+      }
+      evalGate();
+    } catch(e) {}
+  }, 700);
 }
-function evaluateGateReady() {
-  $('btnStartExam').disabled = !($('gateCamItem').classList.contains('ok')&&$('gateFaceItem').classList.contains('ok'));
+function evalGate() {
+  $('btnStartExam').disabled = !(
+    $('gateCamItem').classList.contains('ok') &&
+    $('gateFaceItem').classList.contains('ok')
+  );
 }
 
-/* ── START EXAM ── */
+/* ════════════════════════════════════════════════
+   9) START EXAM
+════════════════════════════════════════════════ */
 async function startExam() {
-  if(gateFaceInterval) clearInterval(gateFaceInterval);
-  QUESTIONS = buildShuffledExam();
-  logEvent('system',`สุ่มข้อสอบแล้ว:[${QUESTIONS.map(q=>q.originalId).join(',')}]`);
-  state.examStarted=true; state.examStartTime=Date.now();
-  $('examCamVideo').srcObject=state.camStream;
+  clearInterval(gateFaceInt);
+  QUESTIONS = buildShuffled();
+  logEv('system','สุ่มข้อสอบ:['+QUESTIONS.map(q=>q.id).join(',')+']');
+  S.started = true; S.startTime = Date.now();
+
+  $('examCamVideo').srcObject = S.camStream;
   $('camMonitor').classList.remove('hidden');
   $('gateScreen').classList.add('hidden');
-  $('examScreen').style.display='block';
-  if(CONFIG.requireFullscreen){try{await document.documentElement.requestFullscreen();}catch(e){}}
-  buildQGrid(); openQuestion(0); startTotalTimer(); startTabSwitchWatcher(); startExamFaceWatcher();
-  logEvent('system','เริ่มทำข้อสอบ');
-}
+  $('examScreen').classList.remove('hidden');
 
-/* render math ($...$) ใน element ถ้า KaTeX พร้อม */
-function renderMath(el){
-  if(typeof renderMathInElement === 'function'){
-    try{
-      renderMathInElement(el,{
-        delimiters:[
-          {left:'$$',right:'$$',display:true},
-          {left:'$',right:'$',display:false},
-        ],
-        throwOnError:false,
-      });
-    }catch(e){}
+  if (CFG.fullscreen) {
+    try { await document.documentElement.requestFullscreen(); } catch(e){}
   }
+
+  buildGrid();
+  openQ(0);
+  startTotalTimer();
+  watchTab();
+  watchFace();
+  setStep(3);
+  logEv('system','เริ่มสอบ');
 }
 
-/* ── TOTAL TIMER ── */
+/* ════════════════════════════════════════════════
+   10) TIMERS
+════════════════════════════════════════════════ */
 function startTotalTimer() {
-  updateTotalTimerDisplay();
-  state.timerInterval = setInterval(()=>{
-    state.remainingSec--;
-    updateTotalTimerDisplay();
-    if(state.remainingSec<=0){clearInterval(state.timerInterval);finishExam('timeout');}
-  },1000);
+  updateTotal();
+  S.totalInterval = setInterval(() => {
+    S.remainSec--;
+    updateTotal();
+    if (S.remainSec <= 0) { clearInterval(S.totalInterval); finish('timeout'); }
+  }, 1000);
 }
-function updateTotalTimerDisplay() {
-  const m=Math.floor(state.remainingSec/60).toString().padStart(2,'0');
-  const s=(state.remainingSec%60).toString().padStart(2,'0');
-  const el=$('examTimer'); el.textContent=`${m}:${s}`;
-  el.classList.toggle('crit',state.remainingSec<=120);
+function updateTotal() {
+  const el = $('totalTimer');
+  el.textContent = fmtSec(S.remainSec);
+  el.className = 'sb-timer-val' + (S.remainSec<=120?' crit':S.remainSec<=300?' warn':'');
 }
 
-/* ── PER-QUESTION TIMER ── */
-function openQuestion(idx) {
-  if(state.qStartTime!==null&&state.current!==null) accumulateQTime(state.current);
-  state.current=idx; state.qStartTime=Date.now();
-  renderQuestion(); startQTimerBar();
+function openQ(idx) {
+  if (S.qStartTime !== null) accQ(S.current);
+  S.current = idx; S.qStartTime = Date.now();
+  renderQ();
+  startQBar();
 }
-function accumulateQTime(idx) {
-  if(state.qStartTime===null) return;
-  state.qTimeSpent[idx]=(state.qTimeSpent[idx]||0)+(Date.now()-state.qStartTime)/1000;
-  state.qStartTime=null;
+function accQ(idx) {
+  if (S.qStartTime === null) return;
+  S.qSpent[idx] = (S.qSpent[idx]||0) + (Date.now()-S.qStartTime)/1000;
+  S.qStartTime = null;
 }
-function startQTimerBar() {
-  cancelAnimationFrame(state.qTimerRAF);
-  function tick() {
-    if(!state.examStarted||state.examEnded) return;
-    const elapsed=state.qStartTime?(Date.now()-state.qStartTime)/1000:0;
-    const spent=(state.qTimeSpent[state.current]||0)+elapsed;
-    const pct=Math.max(0,Math.min(100,(1-spent/CONFIG.perQuestionSec)*100));
-    const fill=$('qTimerBarFill'), label=$('qTimerBarLabel'), qd=$('qTimerDisplay');
-    fill.style.width=pct+'%';
-    fill.className='q-timer-bar-fill'+(pct<20?' crit':pct<40?' warn':'');
-    label.className='q-timer-label'+(pct<20?' crit':'');
-    label.textContent=fmtSec(Math.ceil(spent));
-    qd.textContent=fmtSec(Math.ceil(spent));
-    qd.classList.toggle('crit',pct<20);
-    state.qTimerRAF=requestAnimationFrame(tick);
-  }
-  state.qTimerRAF=requestAnimationFrame(tick);
+function startQBar() {
+  cancelAnimationFrame(S.rafId);
+  const tick = () => {
+    if (!S.started || S.ended) return;
+    const elapsed = S.qStartTime ? (Date.now()-S.qStartTime)/1000 : 0;
+    const total   = (S.qSpent[S.current]||0) + elapsed;
+    const pct     = Math.max(0, Math.min(100, (1 - total/CFG.perQSec)*100));
+    const fill    = $('qBarFill'), time = $('qBarTime'), qd = $('qTimerDisplay');
+    fill.style.width = pct + '%';
+    fill.className   = 'q-bar-fill' + (pct<20?' crit':pct<40?' warn':'');
+    time.className   = 'q-bar-time' + (pct<20?' crit':'');
+    time.textContent = fmtSec(Math.ceil(total));
+    qd.textContent   = fmtSec(Math.ceil(total));
+    qd.className     = 'sb-timer-val' + (pct<20?' crit':pct<40?' warn':'');
+    S.rafId = requestAnimationFrame(tick);
+  };
+  S.rafId = requestAnimationFrame(tick);
 }
-function fmtSec(s){return`${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;}
 
-/* ── RENDER QUESTION ── */
-function buildQGrid() {
-  const grid=$('qGrid'); grid.innerHTML='';
-  QUESTIONS.forEach((_,i)=>{
-    const d=document.createElement('div');
-    d.className='q-grid-item'; d.id='grid-'+i;
-    d.innerHTML=`${i+1}<span class="q-spent-dot"></span>`;
-    d.onclick=()=>openQuestion(i);
-    grid.appendChild(d);
+/* ════════════════════════════════════════════════
+   11) RENDER QUESTION
+════════════════════════════════════════════════ */
+function buildGrid() {
+  const g = $('qGrid'); g.innerHTML = '';
+  QUESTIONS.forEach((_,i) => {
+    const d = document.createElement('div');
+    d.className = 'q-grid-item';
+    d.id = 'gi'+i;
+    d.innerHTML = `${i+1}<span class="q-grid-dot"></span>`;
+    d.onclick = () => openQ(i);
+    g.appendChild(d);
   });
 }
-function renderQuestion() {
-  const q=QUESTIONS[state.current];
-  $('qCounter').textContent=`ข้อ ${state.current+1} / ${QUESTIONS.length}`;
-  $('qText').textContent=q.text;
-  $('progressFill').style.width=`${((state.current+1)/QUESTIONS.length)*100}%`;
+function renderQ() {
+  const q = QUESTIONS[S.current];
+  const total = QUESTIONS.length;
 
-  // Topic badge
-  const badge=$('topicBadge');
-  if(q.topic==='bio'){badge.className='topic-badge bio';badge.textContent='🔬 ลักษณะของสิ่งมีชีวิต';}
-  else{badge.className='topic-badge chem';badge.textContent='⚗ เคมีพื้นฐานของสิ่งมีชีวิต';}
+  $('qCounter').textContent      = `ข้อ ${S.current+1} / ${total}`;
+  const ans = Object.keys(S.answers).length;
+  $('answeredCount').textContent  = `ตอบแล้ว ${ans} ข้อ`;
+  $('gridAnsweredCount').textContent = `${ans}/${total}`;
+  $('progressFill').style.width  = `${((S.current+1)/total)*100}%`;
+  $('unansweredBadge').textContent = (total-ans) > 0 ? `ยังไม่ตอบ ${total-ans} ข้อ` : '';
+
+  const badge = $('topicBadge');
+  if (q.topic==='bio') { badge.className='topic-badge bio'; badge.textContent='🔬 ลักษณะของสิ่งมีชีวิต'; }
+  else                 { badge.className='topic-badge chem'; badge.textContent='⚗ เคมีพื้นฐานของสิ่งมีชีวิต'; }
+
+  $('qText').textContent = q.text;
+  renderMath($('qText'));
 
   // Image
-  const imgWrap=$('qImageWrap');
-  if(q.image&&q.image.url){
-    imgWrap.classList.remove('hidden');
-    imgWrap.innerHTML=`<img src="${q.image.url}" alt="ภาพประกอบข้อ ${state.current+1}" loading="lazy" onerror="this.parentElement.innerHTML='<div style=\\'padding:16px;color:var(--paper-dim);font-size:13px;\\'>⚠ โหลดรูปภาพไม่สำเร็จ</div>'">${q.image.caption?`<div class="q-image-caption">📷 ${q.image.caption}</div>`:''}`;
-  } else {imgWrap.classList.add('hidden');imgWrap.innerHTML='';}
+  if (q.image?.url) {
+    $('qImgWrap').classList.remove('hidden');
+    $('qImg').src = q.image.url;
+    $('qImg').alt = `ภาพประกอบข้อ ${S.current+1}`;
+    $('qImgCaption').textContent = q.image.caption ? '📷 '+q.image.caption : '';
+    $('qImgCaption').style.display = q.image.caption ? '' : 'none';
+    $('qImg').onerror = () => {
+      $('qImgWrap').innerHTML = '<div style="padding:14px;color:var(--text-2);font-size:13px">⚠ โหลดรูปภาพไม่สำเร็จ</div>';
+      $('qImgWrap').classList.remove('hidden');
+    };
+  } else {
+    $('qImgWrap').classList.add('hidden');
+  }
 
   // Choices
-  const wrap=$('qChoices'); wrap.innerHTML='';
-  ['ก','ข','ค','ง'].forEach((L,idx)=>{
-    const div=document.createElement('div');
-    div.className='choice'+(state.answers[state.current]===idx?' selected':'');
-    div.innerHTML=`<span class="letter">${L}</span><span class="ctext"></span>`;
-    div.querySelector('.ctext').textContent=q.choices[idx]||'';
-    div.onclick=()=>{state.answers[state.current]=idx;renderQuestion();};
+  const wrap = $('qChoices'); wrap.innerHTML = '';
+  const letters = ['ก','ข','ค','ง'];
+  q.choices.forEach((c,i) => {
+    const div = document.createElement('div');
+    div.className = 'choice' + (S.answers[S.current]===i ? ' selected' : '');
+    div.innerHTML = `<span class="choice-letter">${letters[i]}</span><span class="choice-text"></span>`;
+    div.querySelector('.choice-text').textContent = c;
+    div.onclick = () => { S.answers[S.current] = i; renderQ(); };
     wrap.appendChild(div);
   });
+  renderMath(wrap);
 
-  document.querySelectorAll('.q-grid-item').forEach((el,i)=>{
-    el.classList.toggle('answered',state.answers[i]!==undefined);
-    el.classList.toggle('current',i===state.current);
-    el.classList.toggle('has-time',(state.qTimeSpent[i]||0)>0);
+  // Grid
+  document.querySelectorAll('.q-grid-item').forEach((el,i) => {
+    el.classList.toggle('answered', S.answers[i] !== undefined);
+    el.classList.toggle('current',  i === S.current);
+    el.classList.toggle('has-time', (S.qSpent[i]||0) > 0);
   });
-  $('btnPrev').disabled=state.current===0;
-  $('btnNext').textContent=state.current===QUESTIONS.length-1?'ข้อสุดท้าย':'ข้อถัดไป';
-}
-$('btnPrev').onclick=()=>{if(state.current>0) openQuestion(state.current-1);};
-$('btnNext').onclick=()=>{if(state.current<QUESTIONS.length-1) openQuestion(state.current+1);};
-$('btnSubmit').onclick=()=>{
-  const u=QUESTIONS.length-Object.keys(state.answers).length;
-  if(confirm(u>0?`ยังไม่ได้ตอบอีก ${u} ข้อ ต้องการส่งเลยหรือไม่?`:`ต้องการส่งข้อสอบหรือไม่?`)) finishExam('submitted');
-};
 
-/* ── FINISH ── */
-async function finishExam(reason) {
-  if(state.examEnded) return; state.examEnded=true;
-  cancelAnimationFrame(state.qTimerRAF);
-  accumulateQTime(state.current);
-  clearInterval(state.timerInterval); clearInterval(state.faceDetectInterval);
-  stopCamera(); if(document.fullscreenElement) document.exitFullscreen().catch(()=>{});
-  const totalSec=CONFIG.examDurationSec-state.remainingSec;
-  const score=computeScore(), maxScore=QUESTIONS.length;
-  logEvent('submit',`ส่งข้อสอบ(${reason}) คะแนน${score}/${maxScore}`);
-  showResultOverlay({score,maxScore,totalSec,reason});
-  await saveToSupabase({score,maxScore,totalSec,reason,disqualified:false});
+  $('btnPrev').disabled = S.current === 0;
+  $('btnNext').textContent = S.current === QUESTIONS.length-1 ? '(ข้อสุดท้าย)' : 'ถัดไป →';
 }
-async function disqualify(reasonText) {
-  if(state.examEnded) return; state.examEnded=true;
-  cancelAnimationFrame(state.qTimerRAF); accumulateQTime(state.current);
-  clearInterval(state.timerInterval); clearInterval(state.faceDetectInterval);
-  stopCamera(); if(document.fullscreenElement) document.exitFullscreen().catch(()=>{});
-  const totalSec=CONFIG.examDurationSec-state.remainingSec;
-  logEvent('disqualify',reasonText);
-  showDisqualifyOverlay(reasonText);
-  await saveToSupabase({score:computeScore(),maxScore:QUESTIONS.length,totalSec,reason:'disqualified',disqualified:true,disqReason:reasonText});
-}
+
+/* ════════════════════════════════════════════════
+   12) FINISH
+════════════════════════════════════════════════ */
 function computeScore() {
-  return QUESTIONS.reduce((s,q,i)=>s+(q.answerIndex!==undefined&&state.answers[i]===q.answerIndex?1:0),0);
+  return QUESTIONS.reduce((s,q,i) => s + (S.answers[i]===q.answerIndex ? 1 : 0), 0);
 }
-
-/* ── SAVE ── */
-async function saveToSupabase({score,maxScore,totalSec,reason,disqualified,disqReason}) {
-  $('savingIndicator').classList.remove('hidden');
-  $('savingText').textContent='กำลังบันทึกผลการสอบ...';
-  const qt={};
-  Object.keys(state.qTimeSpent).forEach(k=>{qt[k]=Math.round(state.qTimeSpent[k]*10)/10;});
-  const answersOriginal={};
-  QUESTIONS.forEach((q,i)=>{
-    const gn=state.answers[i];
-    if(gn!==undefined) answersOriginal[q.originalId]=q.choiceMap[gn];
-  });
-  const payload={
-    exam_id:CONFIG.examId, student_id:state.student.id, student_name:state.student.name,
-    class:state.student.class, number:state.student.number,
-    answers:state.answers, answers_original:answersOriginal,
-    question_order:QUESTIONS.map(q=>q.originalId),
-    q_time_spent:qt, total_sec:totalSec, score, max_score:maxScore,
-    pass_threshold:CONFIG.passPercent,
-    disqualified:disqualified||false, disq_reason:disqReason||null,
-    tab_switches:state.tabSwitchCount, face_missing:state.faceMissingCount,
-    event_log:state.eventLog, submitted_at:new Date().toISOString(),
-  };
-  if(sbClient&&!SUPABASE_URL.includes('YOUR_PROJECT')) {
-    try {
-      const {error}=await sbClient.from('exam_results').insert(payload);
-      if(error) throw error;
-      $('savingText').textContent='✓ บันทึกผลการสอบเรียบร้อยแล้ว';
-    } catch(err) {
-      $('savingText').textContent='⚠ บันทึกไม่สำเร็จ: '+err.message;
-    }
-  } else {
-    console.log('📋 [DEV] payload:',payload);
-    $('savingText').textContent='[DEV] ผลสอบแสดงใน Console';
-  }
+async function finish(reason) {
+  if (S.ended) return; S.ended = true;
+  cancelAnimationFrame(S.rafId);
+  accQ(S.current);
+  clearInterval(S.totalInterval);
+  clearInterval(S.faceInterval);
+  stopCam();
+  clearFsPrompt();
+  if (document.fullscreenElement) document.exitFullscreen().catch(()=>{});
+  const totalSec = CFG.durationSec - S.remainSec;
+  const score = computeScore(), max = QUESTIONS.length;
+  logEv('submit', `ส่ง(${reason}) ${score}/${max}`);
+  showResult({ score, max, totalSec, reason });
+  await saveResult({ score, max, totalSec, reason, disq: false });
 }
-
-/* ── RESULT OVERLAYS ── */
-function showResultOverlay({score,maxScore,totalSec,reason}) {
-  const pct=Math.round((score/maxScore)*100);
-  const passed = pct >= CONFIG.passPercent;
-  $('ovIcon').className='ov-icon success'; $('ovIcon').textContent='✓';
-  $('ovTitle').textContent=reason==='timeout'?'หมดเวลาทำข้อสอบ':'ส่งข้อสอบสำเร็จ';
-  $('ovText').textContent=`${state.student.name} — ${state.student.class} เลขที่ ${state.student.number}`;
-  $('ovLogBox').classList.add('hidden');
-
-  // pass/fail banner
-  const banner=$('ovResultBanner');
-  banner.classList.remove('hidden');
-  banner.className=`result-banner ${passed?'pass':'fail'}`;
-  banner.textContent=passed?`✓ ผ่านเกณฑ์ ${CONFIG.passPercent}% (${Math.ceil(maxScore*CONFIG.passPercent/100)}/${maxScore} ข้อ)`:`✗ ไม่ผ่านเกณฑ์ ${CONFIG.passPercent}% (ต้องได้ ${Math.ceil(maxScore*CONFIG.passPercent/100)}/${maxScore} ข้อขึ้นไป)`;
-
-  const s=$('ovScoreSummary'); s.classList.remove('hidden');
-  s.innerHTML=`<div class="score-cell"><div class="sc-val gold">${score}/${maxScore}</div><div class="sc-label">คะแนนที่ได้</div></div><div class="score-cell"><div class="sc-val${pct>=CONFIG.passPercent?' safe':''}">${pct}%</div><div class="sc-label">เปอร์เซ็นต์</div></div><div class="score-cell"><div class="sc-val">${fmtSec(totalSec)}</div><div class="sc-label">เวลารวมที่ใช้</div></div>`;
-
-  const L=['ก','ข','ค','ง'];
-  const rows=QUESTIONS.map((q,i)=>{
-    const ans=state.answers[i];
-    const ok=q.answerIndex!==undefined&&ans===q.answerIndex;
-    const sp=state.qTimeSpent[i]||0;
-    const topicLabel=q.topic==='bio'?'🔬':'⚗';
-    return`<tr><td class="t-mono">${topicLabel}ข้อ${i+1}<span style="font-size:10px;color:var(--ink-600)"> (#${q.originalId})</span></td><td class="t-mono">${fmtSec(Math.round(sp))}</td><td class="${ans!==undefined?(ok?'t-ans':'t-skip'):'t-skip'}">${ans!==undefined?L[ans]:'-'}</td><td style="font-size:11px;color:var(--paper-dim)">${ans!==undefined?(ok?'✓ ถูก':'✗ ผิด'):'— ไม่ตอบ'}</td></tr>`;
-  }).join('');
-  const t=$('ovQTimeTable'); t.classList.remove('hidden');
-  t.innerHTML=`<table><thead><tr><th>ข้อ</th><th>เวลา</th><th>คำตอบ</th><th>ผล</th></tr></thead><tbody>${rows}</tbody></table>`;
-  $('savingIndicator').classList.remove('hidden');
-  $('fullOverlay').style.display='flex';
+async function disqualify(why) {
+  if (S.ended) return; S.ended = true;
+  cancelAnimationFrame(S.rafId);
+  accQ(S.current);
+  clearInterval(S.totalInterval);
+  clearInterval(S.faceInterval);
+  stopCam();
+  clearFsPrompt();
+  if (document.fullscreenElement) document.exitFullscreen().catch(()=>{});
+  const totalSec = CFG.durationSec - S.remainSec;
+  logEv('disq', why);
+  showDisq(why);
+  await saveResult({ score:computeScore(), max:QUESTIONS.length, totalSec, reason:'disq', disq:true, disqWhy:why });
 }
-function showDisqualifyOverlay(reasonText) {
-  $('ovIcon').className='ov-icon danger'; $('ovIcon').textContent='!';
-  $('ovResultBanner').classList.add('hidden');
-  $('ovTitle').textContent='ถูกตัดสิทธิ์การสอบ'; $('ovText').textContent=reasonText;
-  $('ovScoreSummary').classList.add('hidden'); $('ovQTimeTable').classList.add('hidden');
-  const lb=$('ovLogBox'); lb.classList.remove('hidden');
-  lb.innerHTML=state.eventLog.slice(-12).map(e=>{
-    const cls=e.type==='tab_switch'?'lt-tab':e.type==='face_missing'?'lt-face':'lt-sys';
-    const t=new Date(e.timestamp).toLocaleTimeString('th-TH');
-    return`<div><span class="${cls}">[${t}]</span> ${e.message}</div>`;
-  }).join('');
-  $('savingIndicator').classList.remove('hidden'); $('fullOverlay').style.display='flex';
-}
-function stopCamera() {
-  if(state.camStream) state.camStream.getTracks().forEach(t=>t.stop());
+function stopCam() {
+  if (S.camStream) S.camStream.getTracks().forEach(t => t.stop());
   $('camMonitor').classList.add('hidden');
 }
 
-/* ── PROCTORING ── */
-function startTabSwitchWatcher() {
-  document.addEventListener('visibilitychange',onVisibilityChange);
-  window.addEventListener('blur',onWindowBlur);
+/* ════════════════════════════════════════════════
+   13) SAVE
+════════════════════════════════════════════════ */
+async function saveResult({ score, max, totalSec, reason, disq, disqWhy }) {
+  $('ovSave').classList.remove('hidden');
+  $('ovSaveText').textContent = 'กำลังบันทึกผลการสอบ...';
+  const qt = {};
+  Object.keys(S.qSpent).forEach(k => { qt[k] = Math.round(S.qSpent[k]*10)/10; });
+  const answersOriginal = {};
+  QUESTIONS.forEach((q,i) => {
+    const g = S.answers[i];
+    if (g !== undefined) answersOriginal[q.id] = q.choiceMap[g];
+  });
+  const payload = {
+    exam_id: CFG.examId, student_id: S.student.id, student_name: S.student.name,
+    class: S.student.class, number: S.student.number,
+    answers: S.answers, answers_original: answersOriginal,
+    question_order: QUESTIONS.map(q=>q.id), q_time_spent: qt,
+    total_sec: totalSec, score, max_score: max,
+    pass_threshold: CFG.passPercent, disqualified: disq||false, disq_reason: disqWhy||null,
+    tab_switches: S.tabCount, face_missing: S.faceCount,
+    event_log: S.log, submitted_at: new Date().toISOString(),
+  };
+  if (sbOk()) {
+    try {
+      const { error } = await sb.from('exam_results').insert(payload);
+      if (error) throw error;
+      $('ovSaveText').textContent = '✓ บันทึกผลสำเร็จ';
+    } catch(err) {
+      $('ovSaveText').textContent = '⚠ บันทึกไม่สำเร็จ: ' + err.message;
+    }
+  } else {
+    console.log('📋 [DEV] payload:', payload);
+    $('ovSaveText').textContent = '[DEV] ดูผลใน Console';
+  }
 }
-let lastTabWarnAt=0;
-function registerTabSwitch(source) {
-  if(state.examEnded||!state.examStarted) return;
-  const now=Date.now(); if(now-lastTabWarnAt<600) return; lastTabWarnAt=now;
-  state.tabSwitchCount++; $('tabCountText').textContent=state.tabSwitchCount;
-  logEvent('tab_switch',`สลับแท็บ(${source}) ครั้งที่${state.tabSwitchCount}`);
-  if(state.tabSwitchCount>CONFIG.maxTabSwitch) disqualify(`สลับหน้าจอ/แท็บเกิน ${CONFIG.maxTabSwitch} ครั้ง`);
-  else showWarningToast(`ตรวจพบการสลับหน้าจอ/แท็บ — ห้ามออกจากหน้าสอบ`,state.tabSwitchCount,CONFIG.maxTabSwitch);
+
+/* ════════════════════════════════════════════════
+   14) RESULT OVERLAYS
+════════════════════════════════════════════════ */
+const LABELS = ['ก','ข','ค','ง'];
+
+function showResult({ score, max, totalSec, reason }) {
+  const pct    = Math.round(score/max*100);
+  const passed = pct >= CFG.passPercent;
+  const overlay = $('resultOverlay');
+  $('ovIcon').className   = 'ov-icon-wrap success';
+  $('ovIcon').textContent = '✓';
+  $('ovTitle').textContent = reason==='timeout' ? 'หมดเวลาทำข้อสอบ' : 'ส่งข้อสอบสำเร็จ';
+  $('ovSub').textContent   = `${S.student.name} — ${S.student.class} เลขที่ ${S.student.number}`;
+
+  // Banner
+  const banner = $('ovBanner');
+  banner.classList.remove('hidden');
+  banner.className = 'result-banner ' + (passed ? 'pass' : 'fail');
+  banner.textContent = passed
+    ? `✓ ผ่านเกณฑ์ ${CFG.passPercent}%`
+    : `✗ ไม่ผ่านเกณฑ์ (ต้องได้ ${Math.ceil(max*CFG.passPercent/100)} ข้อขึ้นไป)`;
+
+  // Score grid
+  const sg = $('ovScoreGrid');
+  sg.classList.remove('hidden');
+  sg.innerHTML = `
+    <div class="score-cell"><div class="score-val gold">${score}/${max}</div><div class="score-label">คะแนนที่ได้</div></div>
+    <div class="score-cell"><div class="score-val ${passed?'green':'red'}">${pct}%</div><div class="score-label">เปอร์เซ็นต์</div></div>
+    <div class="score-cell"><div class="score-val">${fmtSec(totalSec)}</div><div class="score-label">เวลารวมที่ใช้</div></div>
+  `;
+
+  // Detail table
+  const tw = $('ovTable');
+  tw.classList.remove('hidden');
+  const rows = QUESTIONS.map((q,i) => {
+    const a = S.answers[i];
+    const ok = a === q.answerIndex;
+    const sp = S.qSpent[i] || 0;
+    const badge = q.topic==='bio' ? '🔬' : '⚗';
+    const result = a!==undefined ? (ok?'<span class="t-green">✓ ถูก</span>':'<span class="t-red">✗ ผิด</span>') : '<span class="t-dim">— ไม่ตอบ</span>';
+    return `<tr><td class="t-gold">${badge}ข้อ${i+1}<span style="font-size:10px;color:var(--text-3)"> #${q.id}</span></td><td class="t-gold">${fmtSec(Math.round(sp))}</td><td>${a!==undefined?LABELS[a]:'—'}</td><td>${result}</td></tr>`;
+  }).join('');
+  tw.innerHTML = `<table><thead><tr><th>ข้อ</th><th>เวลา</th><th>คำตอบ</th><th>ผล</th></tr></thead><tbody>${rows}</tbody></table>`;
+  overlay.style.display = 'flex';
 }
-function onVisibilityChange(){if(document.hidden) registerTabSwitch('visibility');}
-function onWindowBlur(){registerTabSwitch('blur');}
-document.addEventListener('fullscreenchange',()=>{
-  if(state.examStarted&&!state.examEnded&&CONFIG.requireFullscreen&&!document.fullscreenElement)
-    registerTabSwitch('exit-fullscreen');
+
+function showDisq(why) {
+  $('ovIcon').className   = 'ov-icon-wrap danger';
+  $('ovIcon').textContent = '!';
+  $('ovTitle').textContent = 'ถูกตัดสิทธิ์การสอบ';
+  $('ovSub').textContent   = why;
+  $('ovBanner').classList.add('hidden');
+  $('ovScoreGrid').classList.add('hidden');
+  $('ovTable').classList.add('hidden');
+  const lb = $('ovLog');
+  lb.classList.remove('hidden');
+  lb.innerHTML = S.log.slice(-15).map(e => {
+    const cls = e.type==='tab_switch'?'log-tab':e.type==='disq'||e.type==='face_missing'?'log-face':'log-sys';
+    const t = new Date(e.ts).toLocaleTimeString('th-TH');
+    return `<div class="log-entry"><span class="${cls}">[${t}]</span> ${e.msg}</div>`;
+  }).join('');
+  $('resultOverlay').style.display = 'flex';
+}
+
+/* ════════════════════════════════════════════════
+   15) ANTI-CHEAT: TAB / FOCUS
+════════════════════════════════════════════════ */
+let lastTabAt = 0;
+function onTabSwitch(src) {
+  if (!S.started || S.ended) return;
+  const now = Date.now();
+  if (now - lastTabAt < 800) return;
+  lastTabAt = now;
+  S.tabCount++;
+  $('tabText').textContent = S.tabCount;
+  logEv('tab_switch', `สลับแท็บ(${src}) ครั้งที่${S.tabCount}`);
+  if (S.tabCount > CFG.maxTab) {
+    disqualify(`สลับหน้าจอ/แท็บเกิน ${CFG.maxTab} ครั้ง`);
+  } else {
+    showToast('ตรวจพบการสลับหน้าจอ/แท็บ — ห้ามออกจากหน้าสอบ', S.tabCount, CFG.maxTab, 'red');
+  }
+}
+function watchTab() {
+  document.addEventListener('visibilitychange', () => { if (document.hidden) onTabSwitch('visibility'); });
+  window.addEventListener('blur', () => onTabSwitch('blur'));
+}
+
+/* ════════════════════════════════════════════════
+   16) ANTI-CHEAT: FULLSCREEN (grace period)
+════════════════════════════════════════════════ */
+function clearFsPrompt() {
+  clearTimeout(S.fsCountdownId);
+  $('fsPrompt').style.display = 'none';
+  S.fsExitTime = null;
+}
+document.addEventListener('fullscreenchange', () => {
+  if (!S.started || S.ended || !CFG.requireFullscreen) return;
+  if (!document.fullscreenElement) {
+    // Show prompt, start countdown
+    S.fsExitTime = Date.now();
+    let remain = Math.ceil(CFG.fullscreenGrace/1000);
+    $('fsCountdown').textContent = remain;
+    $('fsPrompt').style.display = 'flex';
+    const tick = () => {
+      remain--;
+      $('fsCountdown').textContent = remain;
+      if (remain <= 0) {
+        clearFsPrompt();
+        onTabSwitch('exit-fullscreen');
+      } else {
+        S.fsCountdownId = setTimeout(tick, 1000);
+      }
+    };
+    S.fsCountdownId = setTimeout(tick, 1000);
+  } else {
+    clearFsPrompt();
+    logEv('system','กลับสู่เต็มหน้าจอ');
+  }
 });
-function startExamFaceWatcher() {
-  const ctx=$('examCamCanvas').getContext('2d');
-  state.faceDetectInterval=setInterval(async()=>{
-    if(state.examEnded||!state.faceModelReady||$('examCamVideo').videoWidth===0) return;
-    $('examCamCanvas').width=$('examCamVideo').videoWidth;
-    $('examCamCanvas').height=$('examCamVideo').videoHeight;
-    const det=await faceapi.detectSingleFace($('examCamVideo'),new faceapi.TinyFaceDetectorOptions());
-    ctx.clearRect(0,0,$('examCamCanvas').width,$('examCamCanvas').height);
-    if(det){
-      ctx.strokeStyle='#4f9a72';ctx.lineWidth=2;const b=det.box;
-      ctx.strokeRect(b.x,b.y,b.width,b.height);
-      if(state.faceCurrentlyMissing){
-        state.faceCurrentlyMissing=false;state.faceMissingTimerStart=null;
-        $('monitorDot').className='status-dot live';$('monitorText').textContent='กำลังตรวจสอบ';
-        $('camDot').className='status-dot live';$('camStatusText').textContent='ปกติ';
-        logEvent('face_restored','กลับมาพบใบหน้าแล้ว');
+$('btnReEnterFS').onclick = async () => {
+  try { await document.documentElement.requestFullscreen(); } catch(e){}
+};
+
+/* ════════════════════════════════════════════════
+   17) ANTI-CHEAT: FACE
+════════════════════════════════════════════════ */
+function watchFace() {
+  const ctx = $('examCamCanvas').getContext('2d');
+  S.faceInterval = setInterval(async () => {
+    if (S.ended || !S.faceReady || $('examCamVideo').videoWidth===0) return;
+    const vw = $('examCamVideo').videoWidth, vh = $('examCamVideo').videoHeight;
+    $('examCamCanvas').width = vw; $('examCamCanvas').height = vh;
+    let det;
+    try { det = await faceapi.detectSingleFace($('examCamVideo'), new faceapi.TinyFaceDetectorOptions()); } catch(e) { return; }
+    ctx.clearRect(0,0,vw,vh);
+    if (det) {
+      ctx.strokeStyle = '#3fb37a'; ctx.lineWidth = 2;
+      const b = det.box; ctx.strokeRect(b.x,b.y,b.width,b.height);
+      if (S.faceMissing) {
+        S.faceMissing = false; S.faceMissStart = null;
+        $('monitorDot').className = 'sb-dot live'; $('monitorText').textContent = 'กำลังตรวจสอบ';
+        $('camDot').className = 'sb-dot live'; $('camText').textContent = 'ปกติ';
+        logEv('face_back','พบใบหน้าแล้ว');
       }
     } else {
-      if(!state.faceCurrentlyMissing){
-        state.faceCurrentlyMissing=true;state.faceMissingTimerStart=Date.now();
-        $('monitorDot').className='status-dot warn';$('monitorText').textContent='ไม่พบใบหน้า...';
-        $('camDot').className='status-dot warn';$('camStatusText').textContent='ไม่พบใบหน้า';
-      } else if(Date.now()-state.faceMissingTimerStart>=CONFIG.faceMissingGraceMs){
-        registerFaceMissing();state.faceMissingTimerStart=Date.now()+999999;
+      if (!S.faceMissing) {
+        S.faceMissing = true; S.faceMissStart = Date.now();
+        $('monitorDot').className = 'sb-dot warn'; $('monitorText').textContent = 'ไม่พบใบหน้า...';
+        $('camDot').className = 'sb-dot warn'; $('camText').textContent = 'ไม่พบ';
+      } else if (Date.now()-S.faceMissStart >= CFG.faceMissingGrace) {
+        registerFaceMiss();
+        S.faceMissStart = Date.now() + 9999999;
       }
     }
-  },CONFIG.faceCheckIntervalMs);
+  }, CFG.faceInterval);
 }
-function registerFaceMissing() {
-  if(state.examEnded) return;
-  state.faceMissingCount++;$('faceCountText').textContent=state.faceMissingCount;
-  $('camDot').className='status-dot danger';
-  logEvent('face_missing',`ไม่พบใบหน้า ครั้งที่${state.faceMissingCount}`);
-  if(state.faceMissingCount>CONFIG.maxFaceMissing) disqualify(`ตรวจไม่พบใบหน้าเกิน ${CONFIG.maxFaceMissing} ครั้ง`);
-  else showWarningToast(`ไม่พบใบหน้าในกล้อง — กรุณานั่งในกรอบกล้อง`,state.faceMissingCount,CONFIG.maxFaceMissing);
-}
-
-/* ── TOAST ── */
-let toastTimeout=null;
-function showWarningToast(msg,count,max) {
-  $('warningMsg').textContent=msg;$('warningCount').textContent=`${count}/${max}`;
-  const t=$('warningToast');t.classList.add('show');clearTimeout(toastTimeout);
-  toastTimeout=setTimeout(()=>t.classList.remove('show'),3500);
+function registerFaceMiss() {
+  if (S.ended) return;
+  S.faceCount++;
+  $('faceText').textContent = S.faceCount;
+  $('camDot').className = 'sb-dot danger';
+  logEv('face_missing', `ไม่พบใบหน้า ครั้งที่${S.faceCount}`);
+  if (S.faceCount > CFG.maxFace) {
+    disqualify(`ตรวจไม่พบใบหน้าเกิน ${CFG.maxFace} ครั้ง`);
+  } else {
+    showToast(`ไม่พบใบหน้าในกล้อง — กรุณานั่งในกรอบ`, S.faceCount, CFG.maxFace, 'red');
+  }
 }
 
-/* ── SECURITY ── */
-document.addEventListener('contextmenu',e=>{if(state.examStarted&&!state.examEnded) e.preventDefault();});
-document.addEventListener('keydown',e=>{
-  if(!state.examStarted||state.examEnded) return;
-  if(['F12'].includes(e.key)||((e.ctrlKey||e.metaKey)&&['c','v','u','p','s'].includes(e.key.toLowerCase())))
-    {e.preventDefault();logEvent('system',`บล็อกปุ่ม:${e.key}`);}
+/* ════════════════════════════════════════════════
+   18) TOAST
+════════════════════════════════════════════════ */
+let toastTid = null;
+function showToast(msg, count, max, type='amber') {
+  $('toastMsg').textContent  = msg;
+  $('toastBadge').textContent = `${count}/${max}`;
+  const t = $('toast');
+  t.className = 'show ' + type;
+  clearTimeout(toastTid);
+  toastTid = setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+/* ════════════════════════════════════════════════
+   19) SECURITY EXTRAS
+════════════════════════════════════════════════ */
+document.addEventListener('contextmenu', e => { if (S.started && !S.ended) e.preventDefault(); });
+document.addEventListener('keydown', e => {
+  if (!S.started || S.ended) return;
+  const block = ['F12'] || ((e.ctrlKey||e.metaKey) && 'cvups'.includes(e.key.toLowerCase()));
+  if (e.key==='F12' || ((e.ctrlKey||e.metaKey) && 'cvups'.includes(e.key.toLowerCase()))) {
+    e.preventDefault();
+  }
 });
-document.addEventListener('copy',e=>{if(state.examStarted&&!state.examEnded) e.preventDefault();});
-window.addEventListener('beforeunload',e=>{if(state.examStarted&&!state.examEnded){e.preventDefault();e.returnValue='';}});
+document.addEventListener('copy',  e => { if (S.started && !S.ended) e.preventDefault(); });
+window.addEventListener('beforeunload', e => { if (S.started && !S.ended) { e.preventDefault(); e.returnValue=''; } });
 
-/* ════ TEACHER PANEL ════ */
-let teacherLoggedIn=false, allResults=[], filteredResults=[], sortKey='submitted_at', sortAsc=false;
+/* ════════════════════════════════════════════════
+   20) DOM EVENT BINDINGS
+════════════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', () => {
+  // Init display values
+  $('tabMax').textContent   = CFG.maxTab;
+  $('faceMax').textContent  = CFG.maxFace;
+  $('ruleFaceMax').textContent = CFG.maxFace;
+  $('ruleTabMax').textContent  = CFG.maxTab;
+  $('devNote').innerHTML = sbOk()
+    ? `Supabase: <span style="color:var(--green)">${SUPABASE_URL}</span> | exam: ${CFG.examId} | ${QUESTIONS_MASTER.length} ข้อ | ผ่าน ${CFG.passPercent}%`
+    : `<span style="color:var(--red)">⚠ ยังไม่ได้ตั้งค่า Supabase</span> | exam: ${CFG.examId}`;
 
-$('btnTeacherLogin').onclick=()=>{
-  $('teacherOverlay').classList.add('show');
-  if(!teacherLoggedIn) showTeacherLogin(); else showTeacherDashboard();
-};
-$('btnTeacherLogout').onclick=async()=>{
-  if(sbClient) try{await sbClient.auth.signOut();}catch(e){}
-  teacherLoggedIn=false;
-  $('teacherLoginPanel').style.display='block';
-  $('teacherDashboard').classList.remove('show');
-  $('teacherNameTag').textContent='';
-  $('btnTeacherLogin').className='btn';
-  $('teacherOverlay').classList.remove('show');
-};
-function showTeacherLogin(){$('teacherLoginPanel').style.display='block';$('teacherDashboard').classList.remove('show');}
-function showTeacherDashboard(){$('teacherLoginPanel').style.display='none';$('teacherDashboard').classList.add('show');loadResults();}
+  // Step 1 → 2
+  $('btnRegNext').onclick = () => {
+    if (!validateReg()) return;
+    S.student = {
+      id: $('inputStudentId').value.trim(),
+      name: $('inputStudentName').value.trim(),
+      class: $('inputClass').value,
+      number: +$('inputNumber').value,
+    };
+    logEv('system','ลงทะเบียน:'+S.student.name);
+    $('regScreen').classList.add('hidden');
+    $('gateScreen').classList.remove('hidden');
+    setStep(2);
+  };
 
-$('btnTeacherDoLogin').onclick=async()=>{
-  const email=$('teacherEmail').value.trim(), pass=$('teacherPassword').value;
-  $('teacherLoginError').textContent='';
-  $('btnTeacherDoLogin').textContent='กำลังเข้าสู่ระบบ...';
-  $('btnTeacherDoLogin').disabled=true;
-  if(!sbClient||SUPABASE_URL.includes('YOUR_PROJECT')){
-    teacherLoggedIn=true;
-    $('teacherNameTag').textContent=email||'ครู (DEV)';
-    $('btnTeacherLogin').className='btn teacher-active';
-    $('btnTeacherDoLogin').textContent='เข้าสู่ระบบ';
-    $('btnTeacherDoLogin').disabled=false;
-    showTeacherDashboard(); return;
+  $('btnBack').onclick = () => {
+    $('gateScreen').classList.add('hidden');
+    $('regScreen').classList.remove('hidden');
+    setStep(1);
+  };
+
+  $('btnRequestCam').onclick = requestCamera;
+  $('btnStartExam').onclick  = startExam;
+  $('btnPrev').onclick = () => { if (S.current > 0) openQ(S.current-1); };
+  $('btnNext').onclick = () => { if (S.current < QUESTIONS.length-1) openQ(S.current+1); };
+  $('btnSubmit').onclick = () => {
+    const u = QUESTIONS.length - Object.keys(S.answers).length;
+    if (confirm(u > 0 ? `ยังไม่ได้ตอบอีก ${u} ข้อ ต้องการส่งเลยหรือไม่?` : 'ยืนยันการส่งข้อสอบ?'))
+      finish('submitted');
+  };
+
+  // Teacher
+  $('btnTeacherLogin').onclick = () => {
+    $('teacherOverlay').classList.add('show');
+    if (!teacherIn) showTLogin(); else showTDash();
+  };
+  $('btnTClose').onclick  = () => $('teacherOverlay').classList.remove('show');
+  $('btnTLogout').onclick = async () => {
+    if (sbOk()) try { await sb.auth.signOut(); } catch(e){}
+    teacherIn = false;
+    $('tLoginPanel').style.display = 'block';
+    $('tDashboard').classList.remove('show');
+    $('tUserTag').textContent = '';
+    $('btnTeacherLogin').classList.remove('active');
+    $('teacherOverlay').classList.remove('show');
+  };
+  $('btnTLogin').onclick = doTeacherLogin;
+  $('tPass').addEventListener('keydown', e => { if (e.key==='Enter') doTeacherLogin(); });
+
+  document.addEventListener('keydown', e => {
+    if (e.key==='Escape') {
+      if ($('detailModal').classList.contains('show')) { closeDetail(); return; }
+      if ($('teacherOverlay').classList.contains('show')) $('teacherOverlay').classList.remove('show');
+    }
+  });
+});
+
+/* ════════════════════════════════════════════════
+   21) TEACHER PANEL
+════════════════════════════════════════════════ */
+let teacherIn = false, allResults = [], filteredResults = [];
+let sortKey = 'submitted_at', sortAsc = false;
+let activeTab = 'results';
+
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.t-tab').forEach((el,i) => {
+    el.classList.toggle('active', ['results','qstats'][i] === tab);
+  });
+  $('tabResults').classList.toggle('hidden', tab !== 'results');
+  $('tabQStats').classList.toggle('hidden',  tab !== 'qstats');
+  if (tab === 'qstats') renderQStats();
+}
+
+function showTLogin()  { $('tLoginPanel').style.display='block'; $('tDashboard').classList.remove('show'); }
+function showTDash()   { $('tLoginPanel').style.display='none';  $('tDashboard').classList.add('show'); loadResults(); }
+
+async function doTeacherLogin() {
+  const email = $('tEmail').value.trim(), pass = $('tPass').value;
+  $('tLoginError').textContent = '';
+  $('btnTLogin').textContent = 'กำลังเข้าสู่ระบบ...';
+  $('btnTLogin').disabled = true;
+  if (!sbOk()) {
+    teacherIn = true;
+    $('tUserTag').textContent = email || 'ครู (DEV)';
+    $('btnTeacherLogin').classList.add('active');
+    $('btnTLogin').textContent = 'เข้าสู่ระบบ'; $('btnTLogin').disabled = false;
+    showTDash(); return;
   }
   try {
-    const {data,error}=await sbClient.auth.signInWithPassword({email,password:pass});
-    if(error) throw error;
-    teacherLoggedIn=true;
-    $('teacherNameTag').textContent=data.user.email;
-    $('btnTeacherLogin').className='btn teacher-active';
-    showTeacherDashboard();
+    const { data, error } = await sb.auth.signInWithPassword({ email, password:pass });
+    if (error) throw error;
+    teacherIn = true;
+    $('tUserTag').textContent = data.user.email;
+    $('btnTeacherLogin').classList.add('active');
+    showTDash();
   } catch(err) {
-    $('teacherLoginError').textContent='❌ '+err.message;
+    $('tLoginError').textContent = '❌ ' + err.message;
   } finally {
-    $('btnTeacherDoLogin').textContent='เข้าสู่ระบบ';
-    $('btnTeacherDoLogin').disabled=false;
+    $('btnTLogin').textContent = 'เข้าสู่ระบบ'; $('btnTLogin').disabled = false;
   }
-};
-$('teacherPassword').addEventListener('keydown',e=>{if(e.key==='Enter') $('btnTeacherDoLogin').click();});
+}
 
 async function loadResults() {
-  $('tLoadingRow').classList.remove('hidden');$('tTable').classList.add('hidden');$('tEmptyRow').classList.add('hidden');
-  if(!sbClient||SUPABASE_URL.includes('YOUR_PROJECT')){allResults=generateSampleData();renderTable();return;}
+  $('tLoading').classList.remove('hidden');
+  $('tTable').classList.add('hidden'); $('tEmpty').classList.add('hidden');
+  if (!sbOk()) { allResults = sampleData(); renderTable(); return; }
   try {
-    const {data,error}=await sbClient.from('exam_results').select('*').eq('exam_id',CONFIG.examId).order('submitted_at',{ascending:false});
-    if(error) throw error;
-    allResults=data||[]; renderTable();
+    const { data, error } = await sb.from('exam_results').select('*')
+      .eq('exam_id', CFG.examId).order('submitted_at', {ascending:false});
+    if (error) throw error;
+    allResults = data || [];
+    renderTable();
   } catch(err) {
-    $('tLoadingRow').textContent='⚠ โหลดข้อมูลไม่สำเร็จ: '+err.message;
+    $('tLoading').textContent = '⚠ ' + err.message;
   }
 }
-function generateSampleData() {
-  // ตัวอย่าง 40 ข้อ
-  const makeAns=(n)=>{const a={};for(let i=0;i<n;i++)a[i]=Math.floor(Math.random()*4);return a;};
-  const makeTime=(n)=>{const t={};for(let i=0;i<n;i++)t[i]=Math.floor(30+Math.random()*60);return t;};
+
+function sampleData() {
+  const mkA = n => { const a={}; for(let i=0;i<n;i++) a[i]=Math.floor(Math.random()*4); return a; };
+  const mkT = n => { const t={}; for(let i=0;i<n;i++) t[i]=Math.floor(25+Math.random()*55); return t; };
+  const qOrder = QUESTIONS_MASTER.map(q=>q.id);
   return [
-    {id:'r1',student_id:'1001',student_name:'สมชาย ใจดี',class:'ม.4/1',number:1,score:28,max_score:40,total_sec:2200,disqualified:false,tab_switches:0,face_missing:0,submitted_at:new Date().toISOString(),answers:makeAns(40),q_time_spent:makeTime(40),question_order:QUESTIONS_MASTER.map(q=>q.id)},
-    {id:'r2',student_id:'1002',student_name:'สมหญิง รักเรียน',class:'ม.4/1',number:2,score:22,max_score:40,total_sec:2800,disqualified:false,tab_switches:1,face_missing:0,submitted_at:new Date(Date.now()-120000).toISOString(),answers:makeAns(40),q_time_spent:makeTime(40),question_order:QUESTIONS_MASTER.map(q=>q.id)},
-    {id:'r3',student_id:'1003',student_name:'วิชัย ทุจริต',class:'ม.4/2',number:5,score:10,max_score:40,total_sec:900,disqualified:true,tab_switches:4,face_missing:1,submitted_at:new Date(Date.now()-300000).toISOString(),answers:makeAns(15),q_time_spent:makeTime(15),question_order:QUESTIONS_MASTER.map(q=>q.id)},
+    {id:'r1',student_id:'1001',student_name:'สมชาย ใจดี',class:'ม.4/1',number:1,score:28,max_score:40,total_sec:2200,disqualified:false,tab_switches:0,face_missing:0,submitted_at:new Date().toISOString(),answers:mkA(40),q_time_spent:mkT(40),question_order:qOrder},
+    {id:'r2',student_id:'1002',student_name:'สมหญิง รักเรียน',class:'ม.4/1',number:2,score:22,max_score:40,total_sec:2800,disqualified:false,tab_switches:1,face_missing:0,submitted_at:new Date(Date.now()-120000).toISOString(),answers:mkA(40),q_time_spent:mkT(40),question_order:qOrder},
+    {id:'r3',student_id:'1003',student_name:'วิชัย ทุจริต',class:'ม.4/2',number:5,score:10,max_score:40,total_sec:900,disqualified:true,tab_switches:4,face_missing:1,submitted_at:new Date(Date.now()-300000).toISOString(),answers:mkA(15),q_time_spent:mkT(15),question_order:qOrder},
+    {id:'r4',student_id:'1004',student_name:'อรุณ วิชาการ',class:'ม.4/2',number:8,score:35,max_score:40,total_sec:1900,disqualified:false,tab_switches:0,face_missing:0,submitted_at:new Date(Date.now()-600000).toISOString(),answers:mkA(40),q_time_spent:mkT(40),question_order:qOrder},
   ];
 }
 
 function applyFilter() {
-  const search=$('tSearch').value.toLowerCase();
-  const cls=$('tFilterClass').value;
-  const status=$('tFilterStatus').value;
-  filteredResults=allResults.filter(r=>{
-    const matchText=!search||r.student_name?.toLowerCase().includes(search)||r.student_id?.toLowerCase().includes(search)||r.class?.toLowerCase().includes(search);
-    const matchClass=!cls||r.class===cls;
-    const matchStatus=!status||(status==='disq'?r.disqualified:status==='pass'?!r.disqualified&&(r.score/r.max_score)>=CONFIG.passPercent/100:!r.disqualified&&(r.score/r.max_score)<CONFIG.passPercent/100);
-    return matchText&&matchClass&&matchStatus;
+  const q = $('tSearch').value.toLowerCase();
+  const cls = $('tFilterClass').value;
+  const st = $('tFilterStatus').value;
+  filteredResults = allResults.filter(r => {
+    if (q && !r.student_name?.toLowerCase().includes(q) && !r.student_id?.toLowerCase().includes(q) && !r.class?.toLowerCase().includes(q)) return false;
+    if (cls && r.class !== cls) return false;
+    if (st) {
+      const pct = r.max_score ? (r.score/r.max_score*100) : 0;
+      if (st==='disq' && !r.disqualified) return false;
+      if (st==='pass' && (r.disqualified || pct<CFG.passPercent)) return false;
+      if (st==='fail' && (r.disqualified || pct>=CFG.passPercent)) return false;
+    }
+    return true;
   });
   doSort(); renderRows();
 }
+
 function sortBy(key) {
-  if(sortKey===key) sortAsc=!sortAsc; else{sortKey=key;sortAsc=true;}
-  document.querySelectorAll('table.t-table th').forEach(th=>th.classList.remove('sorted'));
-  const th=$('th-'+key);
-  if(th){th.classList.add('sorted');th.querySelector('.sort-arrow').textContent=sortAsc?'↑':'↓';}
+  if (sortKey===key) sortAsc=!sortAsc; else { sortKey=key; sortAsc=true; }
+  document.querySelectorAll('table.t-table th').forEach(th => th.classList.remove('sorted'));
+  const th = $('th-'+key);
+  if (th) { th.classList.add('sorted'); th.querySelector('.sort-arrow').textContent = sortAsc?'↑':'↓'; }
   doSort(); renderRows();
 }
 function doSort() {
-  filteredResults.sort((a,b)=>{
-    let va=a[sortKey],vb=b[sortKey];
-    if(typeof va==='string') va=va.toLowerCase(),vb=(vb||'').toLowerCase();
-    if(va===undefined||va===null) va=0; if(vb===undefined||vb===null) vb=0;
-    return sortAsc?(va>vb?1:va<vb?-1:0):(va<vb?1:va>vb?-1:0);
+  filteredResults.sort((a,b) => {
+    let va = a[sortKey], vb = b[sortKey];
+    if (typeof va==='string') { va=va.toLowerCase(); vb=(vb||'').toLowerCase(); }
+    if (va==null) va=0; if (vb==null) vb=0;
+    return sortAsc ? (va>vb?1:va<vb?-1:0) : (va<vb?1:va>vb?-1:0);
   });
 }
+
 function renderTable() {
-  const classes=[...new Set(allResults.map(r=>r.class).filter(Boolean))].sort();
-  const sel=$('tFilterClass'); sel.innerHTML='<option value="">ทุกชั้น</option>';
-  classes.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o);});
-  const total=allResults.length, disqCount=allResults.filter(r=>r.disqualified).length;
-  const valid=allResults.filter(r=>!r.disqualified);
-  const avg=valid.length?(valid.reduce((s,r)=>s+(r.score/r.max_score*100),0)/valid.length).toFixed(1):'—';
-  const pass=valid.filter(r=>(r.score/r.max_score)>=CONFIG.passPercent/100).length;
-  $('statTotal').textContent=total;$('statAvg').textContent=avg+(valid.length?'%':'');
-  $('statPass').textContent=pass;$('statDisq').textContent=disqCount;
-  filteredResults=[...allResults]; doSort(); renderRows();
+  const classes = [...new Set(allResults.map(r=>r.class).filter(Boolean))].sort();
+  const sel = $('tFilterClass');
+  sel.innerHTML = '<option value="">ทุกชั้น</option>';
+  classes.forEach(c => { const o=document.createElement('option'); o.value=c; o.textContent=c; sel.appendChild(o); });
+
+  const valid = allResults.filter(r=>!r.disqualified);
+  const avg   = valid.length ? (valid.reduce((s,r)=>s+(r.score/r.max_score*100),0)/valid.length).toFixed(1):'—';
+  const pass  = valid.filter(r=>(r.score/r.max_score)>=CFG.passPercent/100).length;
+  $('statTotal').textContent = allResults.length;
+  $('statAvg').textContent   = avg + (valid.length?'%':'');
+  $('statPass').textContent  = pass;
+  $('statDisq').textContent  = allResults.filter(r=>r.disqualified).length;
+
+  filteredResults = [...allResults]; doSort(); renderRows();
+  if (activeTab==='qstats') renderQStats();
 }
+
 function renderRows() {
-  $('tLoadingRow').classList.add('hidden'); const tbody=$('tBody'); tbody.innerHTML='';
-  if(filteredResults.length===0){$('tTable').classList.add('hidden');$('tEmptyRow').classList.remove('hidden');return;}
-  $('tTable').classList.remove('hidden');$('tEmptyRow').classList.add('hidden');
-  filteredResults.forEach(r=>{
-    const pct=r.max_score?Math.round((r.score/r.max_score)*100):0;
-    const threshold=CONFIG.passPercent;
-    const status=r.disqualified?'<span class="badge disq">ตัดสิทธิ์</span>':pct>=threshold?'<span class="badge pass">ผ่าน</span>':'<span class="badge fail">ไม่ผ่าน</span>';
-    const barCls=pct>=threshold?'high':pct<30?'low':'';
-    const dt=r.submitted_at?new Date(r.submitted_at).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'}):'—';
-    const tr=document.createElement('tr');
-    tr.innerHTML=`<td class="mono-cell">${r.number||'—'}</td><td class="mono-cell">${r.student_id||'—'}</td><td>${r.student_name||'—'}</td><td>${r.class||'—'}</td><td><div class="score-bar-cell"><span class="mono-cell" style="min-width:60px">${r.score}/${r.max_score} <span style="color:var(--paper-dim);font-size:10px">(${pct}%)</span></span><div class="score-bar"><div class="score-bar-fill ${barCls}" style="width:${pct}%"></div></div></div></td><td class="mono-cell">${fmtSec(r.total_sec||0)}</td><td>${status}${r.tab_switches>0?`<span style="font-family:var(--mono);font-size:10px;color:var(--gold);margin-left:4px">แท็บ×${r.tab_switches}</span>`:''}</td><td style="font-size:12px;color:var(--paper-dim)">${dt}</td><td><button class="btn btn-ghost btn-sm" onclick='showDetail(${JSON.stringify(r)})'>ดูรายละเอียด</button></td>`;
-    tbody.appendChild(tr);
+  $('tLoading').classList.add('hidden');
+  const body = $('tBody'); body.innerHTML = '';
+  if (!filteredResults.length) {
+    $('tTable').classList.add('hidden'); $('tEmpty').classList.remove('hidden'); return;
+  }
+  $('tTable').classList.remove('hidden'); $('tEmpty').classList.add('hidden');
+  filteredResults.forEach(r => {
+    const pct = r.max_score ? Math.round(r.score/r.max_score*100) : 0;
+    const passed = !r.disqualified && pct >= CFG.passPercent;
+    const badge  = r.disqualified ? '<span class="badge disq">ตัดสิทธิ์</span>'
+                 : passed ? '<span class="badge pass">ผ่าน</span>'
+                 : '<span class="badge fail">ไม่ผ่าน</span>';
+    const barCls = pct>=CFG.passPercent?'high':pct<30?'low':'';
+    const dt     = r.submitted_at ? new Date(r.submitted_at).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'}) : '—';
+    const tabWarn = r.tab_switches>0 ? `<span style="font-family:var(--font-mono);font-size:10px;color:var(--amber);margin-left:4px">แท็บ×${r.tab_switches}</span>` : '';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="t-mono">${r.number||'—'}</td>
+      <td class="t-mono">${r.student_id||'—'}</td>
+      <td>${r.student_name||'—'}</td>
+      <td>${r.class||'—'}</td>
+      <td><div class="score-bar-wrap"><span class="t-mono" style="min-width:56px">${r.score}/${r.max_score} <span style="color:var(--text-3);font-size:10px">(${pct}%)</span></span><div class="score-bar"><div class="score-bar-fill ${barCls}" style="width:${pct}%"></div></div></div></td>
+      <td class="t-mono">${fmtSec(r.total_sec||0)}</td>
+      <td>${badge}${tabWarn}</td>
+      <td style="font-size:12px;color:var(--text-2)">${dt}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="showDetail(${JSON.stringify(r).replace(/"/g,'&quot;')})">รายละเอียด</button></td>
+    `;
+    body.appendChild(tr);
   });
 }
 
+/* Per-question stats */
+function renderQStats() {
+  const body = $('qStatsBody'); body.innerHTML = '';
+  QUESTIONS_MASTER.forEach(q => {
+    const valid = allResults.filter(r => !r.disqualified);
+    let correct=0, wrong=0, skip=0, totalTime=0, timeCount=0;
+    valid.forEach(r => {
+      const qOrder = r.question_order || QUESTIONS_MASTER.map(m=>m.id);
+      const si = qOrder.indexOf(q.id);
+      const a  = si>=0 ? r.answers?.[si] : undefined;
+      const sp = si>=0 ? (r.q_time_spent?.[si] ?? r.q_time_spent?.[String(si)] ?? 0) : 0;
+      if (sp>0) { totalTime+=sp; timeCount++; }
+      // We need the shuffled answerIndex for this student's ordering — we use answers_original if available
+      const origAns = r.answers_original?.[q.id];
+      if (origAns===undefined||origAns===null) { skip++; }
+      else if (parseInt(origAns)===q.answerIndex) { correct++; }
+      else { wrong++; }
+    });
+    const total = valid.length;
+    const pct   = total ? Math.round(correct/total*100) : 0;
+    const avgT  = timeCount ? Math.round(totalTime/timeCount) : 0;
+    const pctColor = pct>=70?'var(--green)':pct>=40?'var(--amber)':'var(--red)';
+    const topicLabel = q.topic==='bio'?'🔬':'⚗';
+    body.innerHTML += `
+      <tr>
+        <td class="t-mono">${topicLabel}#${q.id}</td>
+        <td style="font-size:12px;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${q.text.substring(0,50)}…</td>
+        <td class="t-mono" style="color:var(--green)">${correct}</td>
+        <td class="t-mono" style="color:var(--red)">${wrong}</td>
+        <td class="t-mono" style="color:var(--text-3)">${skip}</td>
+        <td style="font-family:var(--font-mono);font-size:12px;font-weight:700;color:${pctColor}">${pct}%</td>
+        <td class="t-mono">${fmtSec(avgT)}</td>
+      </tr>
+    `;
+  });
+}
+
+/* Detail modal */
 function showDetail(r) {
-  $('detailName').textContent=r.student_name||'—';
-  $('detailSub').textContent=`รหัส ${r.student_id} | ${r.class} เลขที่ ${r.number}`;
-  const pct=r.max_score?Math.round((r.score/r.max_score)*100):0;
-  const passed=pct>=CONFIG.passPercent;
-  $('detailScoreSummary').innerHTML=`<div class="score-cell"><div class="sc-val gold">${r.score}/${r.max_score}</div><div class="sc-label">คะแนน</div></div><div class="score-cell"><div class="sc-val${passed?' safe':''}">${pct}%<br><span style="font-size:10px;color:var(--paper-dim)">${passed?'ผ่าน':'ไม่ผ่าน'}</span></div><div class="sc-label">ผล</div></div><div class="score-cell"><div class="sc-val">${fmtSec(r.total_sec||0)}</div><div class="sc-label">เวลารวม</div></div>`;
-  const L=['ก','ข','ค','ง'];
-  const qts=r.q_time_spent||{}, ans=r.answers||{};
-  const qOrder=r.question_order||QUESTIONS_MASTER.map(q=>q.id);
-  const rows=QUESTIONS_MASTER.map(q=>{
-    const si=qOrder.indexOf(q.id);
-    const a=si>=0?ans[si]:undefined;
-    const sp=si>=0?(qts[si]||qts[String(si)]||0):0;
-    const correct=q.answerIndex!==undefined&&parseInt(a)===q.answerIndex;
-    const aText=a!==undefined&&a!==null?L[parseInt(a)]:'—';
-    const topicLabel=q.topic==='bio'?'🔬':'⚗';
-    const res=a!==undefined&&a!==null?(correct?'<span style="color:var(--safe)">✓ ถูก</span>':'<span style="color:var(--alert)">✗ ผิด</span>'):'<span style="color:var(--paper-dim)">ไม่ตอบ</span>';
-    return`<tr><td class="mono-cell">${topicLabel}#${q.id}</td><td>${aText}</td><td class="mono-cell">${fmtSec(Math.round(sp))}</td><td>${res}</td></tr>`;
+  $('detailName').textContent = r.student_name||'—';
+  $('detailSub').textContent  = `รหัส ${r.student_id} | ${r.class} เลขที่ ${r.number}`;
+  const pct    = r.max_score ? Math.round(r.score/r.max_score*100) : 0;
+  const passed = !r.disqualified && pct >= CFG.passPercent;
+  $('detailScoreGrid').innerHTML = `
+    <div class="score-cell"><div class="score-val gold">${r.score}/${r.max_score}</div><div class="score-label">คะแนน</div></div>
+    <div class="score-cell"><div class="score-val ${passed?'green':'red'}">${pct}%<br><span style="font-size:10px;color:var(--text-2)">${r.disqualified?'ตัดสิทธิ์':passed?'ผ่าน':'ไม่ผ่าน'}</span></div><div class="score-label">ผล</div></div>
+    <div class="score-cell"><div class="score-val">${fmtSec(r.total_sec||0)}</div><div class="score-label">เวลารวม</div></div>
+  `;
+  const qOrder = r.question_order || QUESTIONS_MASTER.map(q=>q.id);
+  const qts = r.q_time_spent||{}, ans = r.answers||{};
+  const rows = QUESTIONS_MASTER.map(q => {
+    const si  = qOrder.indexOf(q.id);
+    const a   = si>=0 ? ans[si] : undefined;
+    const sp  = si>=0 ? (qts[si]??qts[String(si)]??0) : 0;
+    const orig = r.answers_original?.[q.id];
+    const correct = orig!==undefined ? parseInt(orig)===q.answerIndex : false;
+    const aText = a!==undefined&&a!==null ? LABELS[parseInt(a)] : '—';
+    const res   = a!==undefined ? (correct?'<span style="color:var(--green)">✓</span>':'<span style="color:var(--red)">✗</span>') : '<span style="color:var(--text-3)">—</span>';
+    return `<tr><td class="t-mono">${q.topic==='bio'?'🔬':'⚗'}#${q.id}</td><td>${aText}</td><td class="t-mono">${fmtSec(Math.round(sp))}</td><td>${res}</td></tr>`;
   }).join('');
-  $('detailQBody').innerHTML=rows;
-  $('studentDetailModal').classList.add('show');
+  $('detailBody').innerHTML = rows;
+  $('detailModal').classList.add('show');
 }
-function closeDetailModal(){$('studentDetailModal').classList.remove('show');}
+function closeDetail() { $('detailModal').classList.remove('show'); }
 
-/* CSV */
+/* ════════════════════════════════════════════════
+   22) CSV / EXCEL EXPORT
+════════════════════════════════════════════════ */
 function downloadCSV() {
-  const BOM='\uFEFF';
-  const qHeaders=QUESTIONS_MASTER.map((q,i)=>`ข้อ#${q.id}(${q.topic}),เวลา#${q.id}(วิ)`).join(',');
-  const header=`รหัสนักเรียน,ชื่อ-นามสกุล,ชั้น,เลขที่,คะแนน,คะแนนเต็ม,เปอร์เซ็นต์,ผล,เวลารวม(วิ),สถานะ,สลับแท็บ,ไม่พบหน้า,วันที่ส่ง,${qHeaders}`;
-  const rows=filteredResults.map(r=>{
-    const pct=r.max_score?Math.round((r.score/r.max_score)*100):0;
-    const passed=pct>=CONFIG.passPercent;
-    const status=r.disqualified?'ตัดสิทธิ์':passed?'ผ่าน':'ไม่ผ่าน';
-    const dt=r.submitted_at?new Date(r.submitted_at).toLocaleString('th-TH'):'';
-    const L=['ก','ข','ค','ง'];
-    const qOrder=r.question_order||QUESTIONS_MASTER.map(q=>q.id);
-    const qCols=QUESTIONS_MASTER.map(q=>{
-      const si=qOrder.indexOf(q.id);
-      const a=si>=0?r.answers?.[si]:undefined;
-      const sp=si>=0?(r.q_time_spent?.[si]||r.q_time_spent?.[String(si)]||0):0;
-      return`${a!==undefined&&a!==null?L[parseInt(a)]:'-'},${Math.round(sp)}`;
+  const BOM = '\uFEFF';
+  const qH = QUESTIONS_MASTER.map(q=>`ข้อ#${q.id}(${q.topic}),เวลา#${q.id}(วิ)`).join(',');
+  const header = `รหัสนักเรียน,ชื่อ-นามสกุล,ชั้น,เลขที่,คะแนน,คะแนนเต็ม,เปอร์เซ็นต์,ผล,เวลารวม(วิ),สถานะ,แท็บ,หน้า,วันที่ส่ง,${qH}`;
+  const rows = filteredResults.map(r => {
+    const pct = r.max_score?Math.round(r.score/r.max_score*100):0;
+    const qOrder = r.question_order || QUESTIONS_MASTER.map(q=>q.id);
+    const qCols = QUESTIONS_MASTER.map(q => {
+      const si = qOrder.indexOf(q.id);
+      const a  = si>=0 ? r.answers?.[si] : undefined;
+      const sp = si>=0 ? (r.q_time_spent?.[si]??r.q_time_spent?.[String(si)]??0) : 0;
+      return `${a!==undefined&&a!==null?LABELS[parseInt(a)]:'-'},${Math.round(sp)}`;
     }).join(',');
-    return[r.student_id,`"${r.student_name}"`,r.class,r.number,r.score,r.max_score,pct,passed?'ผ่าน':'ไม่ผ่าน',r.total_sec||0,status,r.tab_switches||0,r.face_missing||0,`"${dt}"`,qCols].join(',');
+    const dt = r.submitted_at ? new Date(r.submitted_at).toLocaleString('th-TH') : '';
+    return [r.student_id,`"${r.student_name}"`,r.class,r.number,r.score,r.max_score,pct,
+            !r.disqualified&&pct>=CFG.passPercent?'ผ่าน':'ไม่ผ่าน',r.total_sec||0,
+            r.disqualified?'ตัดสิทธิ์':pct>=CFG.passPercent?'ผ่าน':'ไม่ผ่าน',
+            r.tab_switches||0,r.face_missing||0,`"${dt}"`,qCols].join(',');
   });
-  const csv=BOM+[header,...rows].join('\n');
-  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');a.href=url;a.download=`คะแนนสอบ_${CONFIG.examId}_${new Date().toLocaleDateString('th-TH')}.csv`;a.click();URL.revokeObjectURL(url);
+  const blob = new Blob([BOM+[header,...rows].join('\n')], {type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download = `คะแนนสอบ_${CFG.examId}_${new Date().toLocaleDateString('th-TH')}.csv`; a.click();
 }
+
 function downloadExcel() {
-  if(window.XLSX){buildExcel();return;}
-  const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';s.onload=buildExcel;document.head.appendChild(s);
+  if (window.XLSX) { buildExcel(); return; }
+  const s = document.createElement('script');
+  s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+  s.onload = buildExcel; document.head.appendChild(s);
 }
 function buildExcel() {
-  const L=['ก','ข','ค','ง'];
-  const qH=QUESTIONS_MASTER.map(q=>[`ข้อ#${q.id}(${q.topic})`,`เวลา#${q.id}(วิ)`]).flat();
-  const headers=['รหัสนักเรียน','ชื่อ-นามสกุล','ชั้น','เลขที่','คะแนน','คะแนนเต็ม','เปอร์เซ็นต์','ผล','เวลารวม(วิ)','สถานะ','สลับแท็บ','ไม่พบหน้า','วันที่ส่ง',...qH];
-  const dataRows=filteredResults.map(r=>{
-    const pct=r.max_score?Math.round((r.score/r.max_score)*100):0;
-    const passed=pct>=CONFIG.passPercent;
-    const status=r.disqualified?'ตัดสิทธิ์':passed?'ผ่าน':'ไม่ผ่าน';
-    const dt=r.submitted_at?new Date(r.submitted_at).toLocaleString('th-TH'):'';
-    const qOrder=r.question_order||QUESTIONS_MASTER.map(q=>q.id);
-    const qCols=QUESTIONS_MASTER.map(q=>{
-      const si=qOrder.indexOf(q.id);
-      const a=si>=0?r.answers?.[si]:undefined;
-      const sp=si>=0?(r.q_time_spent?.[si]||r.q_time_spent?.[String(si)]||0):0;
-      return[a!==undefined&&a!==null?L[parseInt(a)]:'-',Math.round(sp)];
+  const qH = QUESTIONS_MASTER.map(q=>[`ข้อ#${q.id}(${q.topic})`,`เวลา#${q.id}(วิ)`]).flat();
+  const headers = ['รหัส','ชื่อ-นามสกุล','ชั้น','เลขที่','คะแนน','คะแนนเต็ม','%','ผล','เวลา(วิ)','สถานะ','แท็บ','หน้า','วันที่ส่ง',...qH];
+  const dataRows = filteredResults.map(r => {
+    const pct = r.max_score?Math.round(r.score/r.max_score*100):0;
+    const qOrder = r.question_order || QUESTIONS_MASTER.map(q=>q.id);
+    const qCols = QUESTIONS_MASTER.map(q => {
+      const si = qOrder.indexOf(q.id);
+      const a  = si>=0?r.answers?.[si]:undefined;
+      const sp = si>=0?(r.q_time_spent?.[si]??r.q_time_spent?.[String(si)]??0):0;
+      return [a!==undefined&&a!==null?LABELS[parseInt(a)]:'-',Math.round(sp)];
     }).flat();
-    return[r.student_id,r.student_name,r.class,r.number,r.score,r.max_score,pct,passed?'ผ่าน':'ไม่ผ่าน',r.total_sec||0,status,r.tab_switches||0,r.face_missing||0,dt,...qCols];
+    return [r.student_id,r.student_name,r.class,r.number,r.score,r.max_score,pct,
+            !r.disqualified&&pct>=CFG.passPercent?'ผ่าน':'ไม่ผ่าน',r.total_sec||0,
+            r.disqualified?'ตัดสิทธิ์':pct>=CFG.passPercent?'ผ่าน':'ไม่ผ่าน',
+            r.tab_switches||0,r.face_missing||0,
+            r.submitted_at?new Date(r.submitted_at).toLocaleString('th-TH'):'',...qCols];
   });
-  const wb=XLSX.utils.book_new();
-  const ws=XLSX.utils.aoa_to_sheet([headers,...dataRows]);
-  ws['!cols']=headers.map((_,i)=>({wch:i<4?14:12}));
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet([headers,...dataRows]);
+  ws['!cols'] = headers.map((_,i)=>({wch:i<4?14:12}));
   XLSX.utils.book_append_sheet(wb,ws,'ผลการสอบ');
-  const valid=filteredResults.filter(r=>!r.disqualified);
-  const avg=valid.length?(valid.reduce((s,r)=>s+(r.score/r.max_score*100),0)/valid.length).toFixed(1):0;
-  const statsData=[
-    ['สถิติผลการสอบ',CONFIG.examTitle],
-    ['ผู้เข้าสอบทั้งหมด',filteredResults.length],
-    ['คะแนนเฉลี่ย (%)',avg],
-    [`ผ่าน (≥${CONFIG.passPercent}%)`,valid.filter(r=>(r.score/r.max_score)>=CONFIG.passPercent/100).length],
-    [`ไม่ผ่าน (<${CONFIG.passPercent}%)`,valid.filter(r=>(r.score/r.max_score)<CONFIG.passPercent/100).length],
+
+  // Stats sheet
+  const valid = filteredResults.filter(r=>!r.disqualified);
+  const avg   = valid.length?(valid.reduce((s,r)=>s+(r.score/r.max_score*100),0)/valid.length).toFixed(1):0;
+  const ws2 = XLSX.utils.aoa_to_sheet([
+    ['สถิติ',CFG.examTitle],
+    ['ผู้เข้าสอบ',filteredResults.length],
+    ['คะแนนเฉลี่ย(%)',avg],
+    [`ผ่าน(≥${CFG.passPercent}%)`,valid.filter(r=>(r.score/r.max_score)>=CFG.passPercent/100).length],
+    [`ไม่ผ่าน`,valid.filter(r=>(r.score/r.max_score)<CFG.passPercent/100).length],
     ['ถูกตัดสิทธิ์',filteredResults.filter(r=>r.disqualified).length],
-    ['เกณฑ์ผ่าน (%)',CONFIG.passPercent],
-    ['จำนวนข้อ',QUESTIONS_MASTER.length],
-  ];
-  const ws2=XLSX.utils.aoa_to_sheet(statsData);ws2['!cols']=[{wch:24},{wch:16}];
+  ]);
+  ws2['!cols'] = [{wch:22},{wch:14}];
   XLSX.utils.book_append_sheet(wb,ws2,'สถิติ');
-  XLSX.writeFile(wb,`คะแนนสอบ_${CONFIG.examId}_${new Date().toLocaleDateString('th-TH').replace(/\//g,'-')}.xlsx`);
+
+  // Q stats sheet
+  const qStatRows = [['ข้อ','หัวข้อ','%ถูก','ถูก','ผิด','ไม่ตอบ','เวลาเฉลี่ย(วิ)']];
+  QUESTIONS_MASTER.forEach(q => {
+    let cor=0,wr=0,sk=0,tt=0,tc=0;
+    valid.forEach(r => {
+      const qOrder = r.question_order||QUESTIONS_MASTER.map(m=>m.id);
+      const si = qOrder.indexOf(q.id);
+      const sp = si>=0?(r.q_time_spent?.[si]??r.q_time_spent?.[String(si)]??0):0;
+      if(sp>0){tt+=sp;tc++;}
+      const orig = r.answers_original?.[q.id];
+      if(orig===undefined||orig===null) sk++;
+      else if(parseInt(orig)===q.answerIndex) cor++;
+      else wr++;
+    });
+    const pct = valid.length?Math.round(cor/valid.length*100):0;
+    qStatRows.push([`#${q.id}`,q.text.substring(0,60),pct,cor,wr,sk,tc?Math.round(tt/tc):0]);
+  });
+  const ws3 = XLSX.utils.aoa_to_sheet(qStatRows);
+  ws3['!cols'] = [{wch:8},{wch:60},{wch:8},{wch:8},{wch:8},{wch:8},{wch:12}];
+  XLSX.utils.book_append_sheet(wb,ws3,'สถิติรายข้อ');
+
+  XLSX.writeFile(wb,`คะแนนสอบ_${CFG.examId}_${new Date().toLocaleDateString('th-TH').replace(/\//g,'-')}.xlsx`);
 }
-
-document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'){
-    if($('studentDetailModal').classList.contains('show')){closeDetailModal();return;}
-    if($('teacherOverlay').classList.contains('show')){$('teacherOverlay').classList.remove('show');}
-  }
-});
-
-initApp();
 </script>
 </body>
 </html>
