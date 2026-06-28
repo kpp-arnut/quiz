@@ -1,0 +1,1465 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ระบบสอบออนไลน์ ชีววิทยา — ลักษณะสิ่งมีชีวิต + เคมีพื้นฐาน</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+<!-- KaTeX -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<style>
+:root {
+  --ink-950: #0b1220;
+  --ink-900: #111a2e;
+  --ink-800: #182441;
+  --ink-700: #25324f;
+  --ink-600: #3a4a6b;
+  --paper:    #eef1f7;
+  --paper-dim:#9aa7c2;
+  --gold:     #c9a04e;
+  --gold-dim: #8a7038;
+  --alert:    #d6553f;
+  --alert-bg: #2b1512;
+  --safe:     #4f9a72;
+  --safe-bg:  #122418;
+  --accent:   #5b8dee;
+  --accent-bg:#0d1e3a;
+  --serif: 'Noto Serif Thai','Sarabun',serif;
+  --sans:  'Sarabun','Noto Sans Thai',sans-serif;
+  --mono:  'JetBrains Mono','Courier New',monospace;
+  --radius: 3px;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--ink-950);color:var(--paper);font-family:var(--sans);-webkit-font-smoothing:antialiased;}
+body{min-height:100vh;background-image:radial-gradient(ellipse 80% 50% at 50% -10%,rgba(201,160,78,.06),transparent),linear-gradient(var(--ink-950),var(--ink-950));}
+.hidden{display:none!important;}
+button{font-family:inherit;cursor:pointer;}
+::selection{background:var(--gold-dim);color:var(--ink-950);}
+
+#statusBar{position:sticky;top:0;z-index:100;display:flex;align-items:center;background:var(--ink-900);border-bottom:1px solid var(--gold-dim);padding:0 20px;height:52px;font-family:var(--mono);font-size:13px;letter-spacing:.02em;}
+.status-seg{display:flex;align-items:center;gap:8px;padding:0 18px;height:100%;border-right:1px solid var(--ink-700);color:var(--paper-dim);white-space:nowrap;}
+.status-seg:first-child{padding-left:0;}
+.status-dot{width:8px;height:8px;border-radius:50%;background:var(--paper-dim);flex-shrink:0;}
+.status-dot.live{background:var(--safe);animation:pulse-dot 2s infinite;}
+.status-dot.warn{background:var(--gold);animation:pulse-dot 1.2s infinite;}
+.status-dot.danger{background:var(--alert);animation:pulse-dot .8s infinite;}
+@keyframes pulse-dot{0%{box-shadow:0 0 0 0 currentColor;}70%{box-shadow:0 0 0 6px transparent;}100%{box-shadow:0 0 0 0 transparent;}}
+.status-val{color:var(--paper);font-weight:600;}
+.timer-group{display:flex;align-items:center;gap:16px;margin-left:auto;padding-left:18px;}
+.timer-block{display:flex;flex-direction:column;align-items:flex-end;}
+.timer-label{font-size:9px;color:var(--paper-dim);letter-spacing:.12em;text-transform:uppercase;line-height:1;margin-bottom:2px;}
+.timer-val{font-size:17px;font-weight:700;color:var(--paper);letter-spacing:.06em;line-height:1;font-family:var(--mono);}
+.timer-val.crit{color:var(--alert);}
+.timer-divider{width:1px;height:30px;background:var(--ink-700);}
+#btnTeacherLogin{margin-left:auto;background:transparent;border:1px solid var(--ink-600);color:var(--paper-dim);padding:6px 14px;border-radius:var(--radius);font-family:var(--mono);font-size:11px;letter-spacing:.08em;cursor:pointer;transition:border-color .15s,color .15s;white-space:nowrap;}
+#btnTeacherLogin:hover{border-color:var(--gold);color:var(--gold);}
+#btnTeacherLogin.teacher-active{border-color:var(--safe);color:var(--safe);}
+
+#app{max-width:880px;margin:0 auto;padding:40px 20px 100px;}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin:0 0 10px;}
+h1.exam-title{font-family:var(--serif);font-size:28px;font-weight:600;margin:0 0 6px;color:var(--paper);}
+.exam-meta{color:var(--paper-dim);font-size:14px;margin-bottom:32px;}
+
+.card{background:var(--ink-900);border:1px solid var(--ink-700);border-radius:var(--radius);padding:32px;}
+.card+.card{margin-top:20px;}
+
+.reg-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:24px 0;}
+.field{display:flex;flex-direction:column;gap:6px;}
+.field label{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);}
+.field input,.field select{background:var(--ink-800);border:1px solid var(--ink-700);border-radius:var(--radius);color:var(--paper);font-family:var(--sans);font-size:15px;padding:12px 14px;outline:none;transition:border-color .15s;width:100%;}
+.field input:focus,.field select:focus{border-color:var(--gold);}
+.field input::placeholder{color:var(--ink-600);}
+.field select option{background:var(--ink-800);}
+.field-error{font-size:12px;color:var(--alert);margin-top:2px;display:none;}
+.field.has-error input,.field.has-error select{border-color:var(--alert);}
+.field.has-error .field-error{display:block;}
+.info-box{border-radius:var(--radius);padding:14px 18px;font-size:13px;line-height:1.7;margin-bottom:8px;}
+.info-box.accent{background:var(--accent-bg);border:1px solid var(--accent);color:#b0c8f5;}
+.info-box.warn{background:var(--alert-bg);border:1px solid var(--alert);color:#f0c9c0;}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:13px 28px;border-radius:var(--radius);font-size:14px;font-weight:600;letter-spacing:.01em;border:1px solid transparent;transition:filter .15s ease,transform .1s ease;}
+.btn:active{transform:translateY(1px);}
+.btn-primary{background:var(--gold);color:var(--ink-950);}
+.btn-primary:hover{filter:brightness(1.08);}
+.btn-primary:disabled{background:var(--ink-700);color:var(--paper-dim);cursor:not-allowed;}
+.btn-ghost{background:transparent;border-color:var(--ink-600);color:var(--paper-dim);}
+.btn-ghost:hover{border-color:var(--paper-dim);color:var(--paper);}
+.btn-ghost:disabled{opacity:.4;cursor:not-allowed;}
+.btn-danger{background:var(--alert);color:#fff;}
+.btn-safe{background:var(--safe);color:var(--ink-950);}
+.btn-accent{background:var(--accent);color:#fff;}
+.btn-sm{padding:8px 16px;font-size:12px;}
+.btn-row{display:flex;gap:12px;margin-top:28px;}
+
+.gate-checklist{list-style:none;margin:24px 0;padding:0;display:flex;flex-direction:column;gap:12px;}
+.gate-item{display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--ink-800);border:1px solid var(--ink-700);border-radius:var(--radius);font-size:14px;}
+.gate-item .mark{width:22px;height:22px;border-radius:50%;border:2px solid var(--ink-600);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:transparent;}
+.gate-item.ok .mark{border-color:var(--safe);background:var(--safe);color:var(--ink-950);}
+.gate-item.ok .mark::after{content:'✓';}
+.gate-item.fail .mark{border-color:var(--alert);color:var(--alert);}
+.gate-item.fail .mark::after{content:'!';}
+.gate-item .label{flex:1;}
+.gate-item .sub{color:var(--paper-dim);font-size:12px;}
+#gateCamPreview{width:160px;height:120px;background:#000;border-radius:var(--radius);border:1px solid var(--ink-600);object-fit:cover;margin:16px 0;transform:scaleX(-1);}
+.rules-box{background:var(--alert-bg);border:1px solid var(--alert);border-radius:var(--radius);padding:18px 20px;margin:24px 0;font-size:13.5px;line-height:1.8;color:#f0c9c0;}
+.rules-box strong{color:#fff;}
+.rules-box ul{margin:8px 0 0;padding-left:20px;}
+
+/* topic badge */
+.topic-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:2px;font-family:var(--mono);font-size:10px;letter-spacing:.08em;margin-bottom:14px;}
+.topic-badge.bio{background:rgba(79,154,114,.12);border:1px solid var(--safe);color:var(--safe);}
+.topic-badge.chem{background:rgba(91,141,238,.12);border:1px solid var(--accent);color:var(--accent);}
+
+#examScreen{display:none;}
+.q-timer-bar-wrap{display:flex;align-items:center;gap:12px;margin-bottom:18px;}
+.q-timer-bar-track{flex:1;height:6px;background:var(--ink-700);border-radius:3px;overflow:hidden;}
+.q-timer-bar-fill{height:100%;border-radius:3px;background:var(--safe);transition:width .5s linear,background .5s ease;}
+.q-timer-bar-fill.warn{background:var(--gold);}
+.q-timer-bar-fill.crit{background:var(--alert);}
+.q-timer-label{font-family:var(--mono);font-size:12px;color:var(--paper-dim);white-space:nowrap;min-width:44px;text-align:right;}
+.q-timer-label.crit{color:var(--alert);font-weight:700;}
+.progress-track{height:4px;background:var(--ink-700);border-radius:2px;overflow:hidden;margin-bottom:28px;}
+.progress-fill{height:100%;background:var(--gold);transition:width .3s ease;}
+.q-counter{font-family:var(--mono);font-size:12px;color:var(--gold);letter-spacing:.1em;margin-bottom:14px;}
+.q-text{font-family:var(--serif);font-size:20px;line-height:1.6;margin:0 0 20px;color:var(--paper);}
+
+.q-image-wrap{margin:0 0 20px;border-radius:var(--radius);overflow:hidden;border:1px solid var(--ink-700);background:var(--ink-800);text-align:center;}
+.q-image-wrap img{max-width:100%;max-height:340px;object-fit:contain;display:block;margin:0 auto;}
+.q-image-caption{font-size:11px;color:var(--paper-dim);font-family:var(--mono);padding:6px 10px;border-top:1px solid var(--ink-700);text-align:center;}
+
+.choices{display:flex;flex-direction:column;gap:10px;}
+.choice{display:flex;align-items:flex-start;gap:14px;padding:16px 18px;background:var(--ink-800);border:1px solid var(--ink-700);border-radius:var(--radius);cursor:pointer;transition:border-color .15s ease,background .15s ease;}
+.choice:hover{border-color:var(--ink-600);}
+.choice.selected{border-color:var(--gold);background:rgba(201,160,78,.08);}
+.choice .letter{width:26px;height:26px;border-radius:50%;border:1.5px solid var(--ink-600);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--paper-dim);flex-shrink:0;}
+.choice.selected .letter{border-color:var(--gold);background:var(--gold);color:var(--ink-950);}
+.choice .ctext{padding-top:3px;line-height:1.55;}
+.nav-row{display:flex;justify-content:space-between;align-items:center;margin-top:32px;}
+.q-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(34px,1fr));gap:6px;margin-top:20px;}
+.q-grid-item{aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;border-radius:2px;border:1px solid var(--ink-700);background:var(--ink-800);color:var(--paper-dim);cursor:pointer;position:relative;}
+.q-grid-item.answered{border-color:var(--gold-dim);color:var(--gold);}
+.q-grid-item.current{border-color:var(--gold);background:var(--gold);color:var(--ink-950);font-weight:700;}
+.q-grid-item .q-spent-dot{position:absolute;bottom:2px;right:2px;width:4px;height:4px;border-radius:50%;background:var(--accent);opacity:0;}
+.q-grid-item.has-time .q-spent-dot{opacity:1;}
+
+.shuffle-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(201,160,78,.12);border:1px solid var(--gold-dim);color:var(--gold);font-family:var(--mono);font-size:10px;letter-spacing:.08em;padding:3px 9px;border-radius:2px;margin-bottom:16px;}
+
+#camMonitor{position:fixed;bottom:20px;right:20px;width:150px;z-index:90;background:var(--ink-900);border:1px solid var(--ink-700);border-radius:var(--radius);overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.4);}
+#camMonitor video{width:100%;height:112px;object-fit:cover;display:block;background:#000;transform:scaleX(-1);}
+#camMonitor canvas{position:absolute;top:0;left:0;width:100%;height:112px;transform:scaleX(-1);}
+.cam-footer{display:flex;align-items:center;gap:6px;padding:6px 10px;font-family:var(--mono);font-size:10px;color:var(--paper-dim);border-top:1px solid var(--ink-700);}
+
+#warningToast{position:fixed;top:70px;left:50%;z-index:200;transform:translateX(-50%) translateY(-12px);background:var(--alert-bg);border:1px solid var(--alert);color:#f5d7d0;padding:14px 22px;border-radius:var(--radius);font-size:14px;font-weight:600;display:flex;align-items:center;gap:12px;opacity:0;pointer-events:none;transition:opacity .25s ease,transform .25s ease;box-shadow:0 10px 30px rgba(0,0,0,.5);max-width:90vw;}
+#warningToast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+#warningToast .wcount{font-family:var(--mono);background:var(--alert);color:#fff;padding:2px 8px;border-radius:2px;font-size:12px;}
+
+#fullOverlay{position:fixed;inset:0;z-index:300;background:rgba(11,18,32,.96);display:none;align-items:center;justify-content:center;padding:20px;}
+#fullOverlay .ov-card{max-width:560px;width:100%;text-align:center;background:var(--ink-900);border:1px solid var(--ink-700);border-radius:var(--radius);padding:40px 32px;max-height:90vh;overflow-y:auto;}
+.ov-icon{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:26px;font-weight:700;}
+.ov-icon.danger{background:var(--alert-bg);border:1.5px solid var(--alert);color:var(--alert);}
+.ov-icon.success{background:var(--safe-bg);border:1.5px solid var(--safe);color:var(--safe);}
+.ov-title{font-family:var(--serif);font-size:22px;margin:0 0 10px;}
+.ov-text{color:var(--paper-dim);font-size:14px;line-height:1.7;margin-bottom:8px;}
+.score-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:20px 0;}
+.score-cell{background:var(--ink-950);border:1px solid var(--ink-700);border-radius:var(--radius);padding:14px 8px;text-align:center;}
+.score-cell .sc-val{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--paper);}
+.score-cell .sc-val.gold{color:var(--gold);}
+.score-cell .sc-val.safe{color:var(--safe);}
+.score-cell .sc-label{font-size:11px;color:var(--paper-dim);margin-top:4px;}
+/* pass/fail banner */
+.result-banner{border-radius:var(--radius);padding:12px 20px;font-family:var(--serif);font-size:16px;font-weight:600;margin:12px 0;text-align:center;}
+.result-banner.pass{background:var(--safe-bg);border:1px solid var(--safe);color:var(--safe);}
+.result-banner.fail{background:var(--alert-bg);border:1px solid var(--alert);color:var(--alert);}
+.q-time-table{margin-top:20px;text-align:left;background:var(--ink-950);border:1px solid var(--ink-700);border-radius:var(--radius);overflow:hidden;max-height:220px;overflow-y:auto;}
+.q-time-table table{width:100%;border-collapse:collapse;}
+.q-time-table th{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--paper-dim);padding:8px 12px;background:var(--ink-900);border-bottom:1px solid var(--ink-700);text-align:left;}
+.q-time-table td{padding:7px 12px;font-size:12px;border-bottom:1px dashed var(--ink-800);}
+.q-time-table tr:last-child td{border-bottom:none;}
+.q-time-table .t-mono{font-family:var(--mono);color:var(--gold);}
+.q-time-table .t-ans{color:var(--safe);}
+.q-time-table .t-skip{color:var(--alert);}
+.log-box{margin-top:16px;text-align:left;background:var(--ink-950);border:1px solid var(--ink-700);border-radius:var(--radius);padding:14px 16px;font-family:var(--mono);font-size:11.5px;color:var(--paper-dim);max-height:140px;overflow-y:auto;}
+.log-box div{padding:2px 0;border-bottom:1px dashed var(--ink-800);}
+.log-box div:last-child{border-bottom:none;}
+.log-box .lt-tab{color:var(--gold);}
+.log-box .lt-face{color:#e08a6d;}
+.log-box .lt-sys{color:var(--paper-dim);}
+#savingIndicator{display:flex;align-items:center;gap:10px;color:var(--paper-dim);font-size:13px;margin-top:16px;justify-content:center;}
+.spinner{width:16px;height:16px;border-radius:50%;border:2px solid var(--ink-600);border-top-color:var(--gold);animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* ── KaTeX color fix for dark background ── */
+.katex{color:var(--paper);font-size:1em;}
+.q-text .katex-display{margin:.4em 0;}
+.nav-row{display:flex;justify-content:space-between;align-items:center;margin-top:32px;}
+.q-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(34px,1fr));gap:6px;margin-top:20px;}
+.q-grid-item{aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;border-radius:2px;border:1px solid var(--ink-700);background:var(--ink-800);color:var(--paper-dim);cursor:pointer;position:relative;}
+.q-grid-item.answered{border-color:var(--gold-dim);color:var(--gold);}
+.q-grid-item.current{border-color:var(--gold);background:var(--gold);color:var(--ink-950);font-weight:700;}
+.q-grid-item .q-spent-dot{position:absolute;bottom:2px;right:2px;width:4px;height:4px;border-radius:50%;background:var(--accent);opacity:0;}
+.q-grid-item.has-time .q-spent-dot{opacity:1;}
+
+/* ════ TEACHER PANEL ════ */
+#teacherOverlay{position:fixed;inset:0;z-index:400;background:rgba(11,18,32,.98);display:none;flex-direction:column;overflow:hidden;}
+#teacherOverlay.show{display:flex;}
+.teacher-topbar{display:flex;align-items:center;gap:16px;background:var(--ink-900);border-bottom:1px solid var(--gold-dim);padding:0 24px;height:56px;flex-shrink:0;}
+.teacher-topbar .t-logo{font-family:var(--mono);font-size:12px;letter-spacing:.15em;text-transform:uppercase;color:var(--gold);}
+.teacher-topbar .t-title{font-family:var(--serif);font-size:18px;color:var(--paper);margin-left:4px;}
+.teacher-topbar .t-spacer{flex:1;}
+.teacher-topbar .t-logout{background:transparent;border:1px solid var(--ink-600);color:var(--paper-dim);padding:6px 14px;border-radius:var(--radius);font-family:var(--mono);font-size:11px;cursor:pointer;transition:border-color .15s;}
+.teacher-topbar .t-logout:hover{border-color:var(--alert);color:var(--alert);}
+.teacher-body{flex:1;overflow:hidden;display:flex;flex-direction:column;padding:24px;gap:20px;max-width:1100px;width:100%;margin:0 auto;}
+#teacherLoginPanel{max-width:400px;margin:60px auto 0;background:var(--ink-900);border:1px solid var(--ink-700);border-radius:var(--radius);padding:36px 32px;text-align:center;}
+#teacherLoginPanel h2{font-family:var(--serif);font-size:22px;margin:0 0 6px;}
+#teacherLoginPanel p{color:var(--paper-dim);font-size:13px;margin-bottom:24px;}
+#teacherLoginPanel .field{text-align:left;}
+#teacherLoginError{color:var(--alert);font-size:13px;margin-top:10px;min-height:20px;}
+#teacherDashboard{display:none;flex-direction:column;gap:20px;flex:1;overflow:hidden;}
+#teacherDashboard.show{display:flex;}
+.t-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+.t-stat-card{background:var(--ink-900);border:1px solid var(--ink-700);border-radius:var(--radius);padding:18px 16px;}
+.t-stat-val{font-family:var(--mono);font-size:26px;font-weight:700;color:var(--paper);}
+.t-stat-val.gold{color:var(--gold);}
+.t-stat-val.safe{color:var(--safe);}
+.t-stat-val.alert{color:var(--alert);}
+.t-stat-label{font-size:11px;color:var(--paper-dim);margin-top:4px;font-family:var(--mono);letter-spacing:.06em;}
+.t-controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.t-filter-input{background:var(--ink-800);border:1px solid var(--ink-700);border-radius:var(--radius);color:var(--paper);font-family:var(--sans);font-size:14px;padding:9px 14px;outline:none;transition:border-color .15s;min-width:200px;}
+.t-filter-input:focus{border-color:var(--gold);}
+.t-filter-select{background:var(--ink-800);border:1px solid var(--ink-700);border-radius:var(--radius);color:var(--paper);font-family:var(--sans);font-size:14px;padding:9px 14px;outline:none;cursor:pointer;}
+.t-filter-select option{background:var(--ink-800);}
+.t-table-wrap{flex:1;overflow:auto;background:var(--ink-900);border:1px solid var(--ink-700);border-radius:var(--radius);}
+table.t-table{width:100%;border-collapse:collapse;min-width:780px;}
+table.t-table thead{position:sticky;top:0;z-index:1;}
+table.t-table th{background:var(--ink-800);font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--paper-dim);padding:10px 14px;text-align:left;border-bottom:1px solid var(--ink-700);white-space:nowrap;cursor:pointer;user-select:none;}
+table.t-table th:hover{color:var(--gold);}
+table.t-table th .sort-arrow{opacity:.3;margin-left:4px;}
+table.t-table th.sorted .sort-arrow{opacity:1;color:var(--gold);}
+table.t-table td{padding:10px 14px;font-size:13px;border-bottom:1px dashed var(--ink-800);vertical-align:middle;}
+table.t-table tr:last-child td{border-bottom:none;}
+table.t-table tr:hover td{background:rgba(255,255,255,.02);}
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:2px;font-family:var(--mono);font-size:11px;font-weight:600;}
+.badge.pass{background:var(--safe-bg);color:var(--safe);border:1px solid var(--safe);}
+.badge.fail{background:var(--alert-bg);color:var(--alert);border:1px solid var(--alert);}
+.badge.disq{background:#1a1020;color:#c46fef;border:1px solid #7d4eaf;}
+.score-bar-cell{display:flex;align-items:center;gap:8px;}
+.score-bar{flex:1;height:6px;background:var(--ink-700);border-radius:3px;overflow:hidden;min-width:60px;}
+.score-bar-fill{height:100%;border-radius:3px;background:var(--gold);}
+.score-bar-fill.high{background:var(--safe);}
+.score-bar-fill.low{background:var(--alert);}
+.mono-cell{font-family:var(--mono);font-size:12px;color:var(--gold);}
+.t-empty{text-align:center;padding:48px;color:var(--paper-dim);font-size:14px;}
+#studentDetailModal{position:fixed;inset:0;z-index:500;background:rgba(11,18,32,.92);display:none;align-items:center;justify-content:center;padding:20px;}
+#studentDetailModal.show{display:flex;}
+.detail-card{background:var(--ink-900);border:1px solid var(--ink-700);border-radius:var(--radius);padding:32px;max-width:600px;width:100%;max-height:90vh;overflow-y:auto;}
+.detail-card h3{font-family:var(--serif);font-size:20px;margin:0 0 4px;}
+.detail-card .detail-sub{color:var(--paper-dim);font-size:13px;margin-bottom:20px;}
+.detail-q-table{width:100%;border-collapse:collapse;font-size:13px;}
+.detail-q-table th{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--paper-dim);padding:7px 10px;border-bottom:1px solid var(--ink-700);text-align:left;}
+.detail-q-table td{padding:7px 10px;border-bottom:1px dashed var(--ink-800);}
+.detail-q-table tr:last-child td{border-bottom:none;}
+footer.dev-note{max-width:880px;margin:40px auto 0;padding:16px 20px;font-family:var(--mono);font-size:11px;color:var(--ink-600);border-top:1px dashed var(--ink-700);line-height:1.7;}
+
+@media(max-width:680px){
+  #app{padding:20px 14px 100px;}
+  .card{padding:22px;}
+  #statusBar{font-size:11px;padding:0 10px;}
+  .status-seg{padding:0 8px;gap:5px;}
+  #camMonitor{width:110px;bottom:12px;right:12px;}
+  #camMonitor video,#camMonitor canvas{height:82px;}
+  .reg-grid{grid-template-columns:1fr;}
+  .score-summary{grid-template-columns:repeat(3,1fr);}
+  .timer-group{gap:10px;}
+  .timer-val{font-size:14px;}
+  .t-stats{grid-template-columns:repeat(2,1fr);}
+  .teacher-body{padding:16px;}
+}
+</style>
+</head>
+<body>
+
+<!-- STATUS BAR -->
+<div id="statusBar">
+  <div class="status-seg">
+    <span class="status-dot" id="camDot"></span>
+    <span>กล้อง:</span><span class="status-val" id="camStatusText">รอเริ่ม</span>
+  </div>
+  <div class="status-seg">
+    <span>สลับแท็บ:</span>
+    <span class="status-val" id="tabCountText">0</span>/<span id="tabMaxText">3</span>
+  </div>
+  <div class="status-seg">
+    <span>ไม่พบหน้า:</span>
+    <span class="status-val" id="faceCountText">0</span>/<span id="faceMaxText">3</span>
+  </div>
+  <div class="status-seg" style="border:none;margin-left:auto;padding-right:0;">
+    <div class="timer-group">
+      <div class="timer-block">
+        <span class="timer-label">ข้อนี้</span>
+        <span class="timer-val" id="qTimerDisplay">--:--</span>
+      </div>
+      <div class="timer-divider"></div>
+      <div class="timer-block">
+        <span class="timer-label">ทั้งหมด</span>
+        <span class="timer-val" id="examTimer">--:--</span>
+      </div>
+      <button id="btnTeacherLogin">🔑 ครู</button>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+
+  <!-- REGISTRATION -->
+  <section id="regScreen" class="card">
+    <p class="eyebrow">ลงทะเบียนเข้าสอบ</p>
+    <h1 class="exam-title" id="regExamTitle">ชีววิทยา — ลักษณะสิ่งมีชีวิต &amp; เคมีพื้นฐาน</h1>
+    <p class="exam-meta">กรุณากรอกข้อมูลให้ครบถ้วนก่อนเริ่มทำข้อสอบ</p>
+    <div class="info-box accent">ข้อมูลของท่านจะถูกบันทึกในระบบเพื่อใช้ในการตรวจและบันทึกคะแนน กรุณากรอกข้อมูลที่ถูกต้องตรงกับทะเบียนนักเรียน</div>
+    <div class="reg-grid">
+      <div class="field" id="fieldStudentId">
+        <label>รหัสนักเรียน</label>
+        <input type="text" id="inputStudentId" placeholder="เช่น 12345" maxlength="10" inputmode="numeric">
+        <span class="field-error" id="errStudentId">กรุณากรอกรหัสนักเรียน</span>
+      </div>
+      <div class="field" id="fieldStudentName">
+        <label>ชื่อ-นามสกุล</label>
+        <input type="text" id="inputStudentName" placeholder="กรอกชื่อ-นามสกุล">
+        <span class="field-error" id="errStudentName">กรุณากรอกชื่อ-นามสกุล</span>
+      </div>
+      <div class="field" id="fieldClass">
+        <label>ชั้นเรียน</label>
+        <select id="inputClass">
+          <option value="">-- เลือกชั้น --</option>
+          <option>ม.4/1</option><option>ม.4/2</option><option>ม.4/3</option><option>ม.4/4</option><option>ม.4/5</option><option>ม.4/6</option>
+        </select>
+        <span class="field-error" id="errClass">กรุณาเลือกชั้นเรียน</span>
+      </div>
+      <div class="field" id="fieldNumber">
+        <label>เลขที่</label>
+        <input type="number" id="inputNumber" placeholder="เช่น 12" min="1" max="50" inputmode="numeric">
+        <span class="field-error" id="errNumber">กรุณากรอกเลขที่</span>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btnRegNext" style="margin-left:auto">ยืนยันและเปิดกล้อง →</button>
+    </div>
+  </section>
+
+  <!-- GATE -->
+  <section id="gateScreen" class="card hidden">
+    <p class="eyebrow">ตรวจสอบก่อนเริ่ม</p>
+    <h1 class="exam-title" id="gateExamTitle">ชีววิทยา — ลักษณะสิ่งมีชีวิต &amp; เคมีพื้นฐาน</h1>
+    <p class="exam-meta" id="gateExamMeta">40 ข้อ • 50 นาที • เกณฑ์ผ่าน 60%</p>
+    <div class="rules-box">
+      <strong>ข้อกำหนดการสอบ</strong>
+      <ul>
+        <li>ระบบเปิดกล้องตลอดการสอบ <strong>ไม่มีการบันทึกภาพ/วิดีโอ</strong> ประมวลผลในเครื่องเท่านั้น</li>
+        <li>ไม่พบใบหน้าต่อเนื่องเกิน <strong id="ruleFaceMax">3</strong> ครั้ง → ถูกตัดสิทธิ์ทันที</li>
+        <li>สลับแท็บ/ย่อหน้าต่างเกิน <strong id="ruleTabMax">3</strong> ครั้ง → ถูกตัดสิทธิ์ทันที</li>
+        <li><strong>ข้อและตัวเลือกจะถูกสุ่มลำดับ</strong> แตกต่างกันในแต่ละนักเรียน</li>
+        <li>เกณฑ์ผ่าน <strong>60% ขึ้นไป (24/40 ข้อ)</strong></li>
+        <li>เมื่อเริ่มแล้วทำได้ครั้งเดียว ไม่สามารถกลับมาทำต่อได้</li>
+      </ul>
+    </div>
+    <ul class="gate-checklist">
+      <li class="gate-item" id="gateCamItem"><span class="mark"></span><span class="label">อนุญาตให้ใช้กล้อง<div class="sub" id="gateCamSub">ยังไม่ได้ตรวจสอบ</div></span></li>
+      <li class="gate-item" id="gateFaceItem"><span class="mark"></span><span class="label">ตรวจพบใบหน้าในเฟรม<div class="sub" id="gateFaceSub">รอกล้องพร้อม</div></span></li>
+      <li class="gate-item ok"><span class="mark"></span><span class="label">โหมดเต็มหน้าจอ<div class="sub">จะเปิดอัตโนมัติเมื่อเริ่มสอบ</div></span></li>
+    </ul>
+    <video id="gateCamPreview" autoplay muted playsinline></video>
+    <div class="btn-row">
+      <button class="btn btn-ghost" id="btnBack">← ย้อนกลับ</button>
+      <button class="btn btn-ghost" id="btnRequestCam">เปิดกล้อง</button>
+      <button class="btn btn-primary" id="btnStartExam" disabled>เริ่มทำข้อสอบ</button>
+    </div>
+  </section>
+
+  <!-- EXAM -->
+  <section id="examScreen">
+    <div class="q-timer-bar-wrap">
+      <span style="font-family:var(--mono);font-size:10px;color:var(--paper-dim);letter-spacing:.1em;white-space:nowrap;">เวลาต่อข้อ</span>
+      <div class="q-timer-bar-track"><div class="q-timer-bar-fill" id="qTimerBarFill" style="width:100%"></div></div>
+      <span class="q-timer-label" id="qTimerBarLabel">--</span>
+    </div>
+    <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+    <div class="shuffle-badge">🔀 ข้อและตัวเลือกถูกสุ่มลำดับแล้ว</div>
+    <div id="topicBadge" class="topic-badge bio"></div>
+    <div class="q-counter" id="qCounter">ข้อ 1 / 40</div>
+    <p class="q-text" id="qText">...</p>
+    <div id="qImageWrap" class="q-image-wrap hidden"></div>
+    <div class="choices" id="qChoices"></div>
+    <div class="nav-row">
+      <button class="btn btn-ghost" id="btnPrev">ย้อนกลับ</button>
+      <button class="btn btn-primary" id="btnNext">ข้อถัดไป</button>
+    </div>
+    <div class="q-grid" id="qGrid"></div>
+    <div class="btn-row">
+      <button class="btn btn-danger" id="btnSubmit" style="margin-left:auto">ส่งข้อสอบ</button>
+    </div>
+  </section>
+</div>
+
+<!-- Floating camera -->
+<div id="camMonitor" class="hidden">
+  <div style="position:relative">
+    <video id="examCamVideo" autoplay muted playsinline></video>
+    <canvas id="examCamCanvas"></canvas>
+  </div>
+  <div class="cam-footer">
+    <span class="status-dot live" id="monitorDot"></span>
+    <span id="monitorText">กำลังตรวจสอบ</span>
+  </div>
+</div>
+
+<!-- Warning toast -->
+<div id="warningToast">
+  <span>⚠</span>
+  <span id="warningMsg">คำเตือน</span>
+  <span class="wcount" id="warningCount">1/3</span>
+</div>
+
+<!-- Result overlay -->
+<div id="fullOverlay">
+  <div class="ov-card">
+    <div class="ov-icon" id="ovIcon">!</div>
+    <h2 class="ov-title" id="ovTitle">หัวข้อ</h2>
+    <p class="ov-text" id="ovText">รายละเอียด</p>
+    <div id="ovResultBanner" class="hidden"></div>
+    <div class="score-summary hidden" id="ovScoreSummary"></div>
+    <div class="q-time-table hidden" id="ovQTimeTable"></div>
+    <div class="log-box hidden" id="ovLogBox"></div>
+    <div id="savingIndicator" class="hidden">
+      <div class="spinner"></div><span id="savingText">กำลังบันทึกผลการสอบ...</span>
+    </div>
+  </div>
+</div>
+
+<!-- TEACHER OVERLAY -->
+<div id="teacherOverlay">
+  <div class="teacher-topbar">
+    <span class="t-logo">🎓</span>
+    <span class="t-title">แผงครู — ระบบสอบออนไลน์</span>
+    <span class="t-spacer"></span>
+    <span id="teacherNameTag" style="font-family:var(--mono);font-size:12px;color:var(--paper-dim);margin-right:12px;"></span>
+    <button class="t-logout" id="btnTeacherLogout">ออกจากระบบ</button>
+  </div>
+  <div style="overflow-y:auto;flex:1;">
+    <div id="teacherLoginPanel">
+      <div style="font-size:36px;margin-bottom:12px;">🔐</div>
+      <h2>เข้าสู่ระบบครู</h2>
+      <p>ใช้อีเมลและรหัสผ่านที่ลงทะเบียนไว้ใน Supabase Auth</p>
+      <div class="field" style="margin-bottom:14px;">
+        <label>อีเมล</label>
+        <input type="email" id="teacherEmail" placeholder="teacher@school.ac.th" autocomplete="username">
+      </div>
+      <div class="field" style="margin-bottom:6px;">
+        <label>รหัสผ่าน</label>
+        <input type="password" id="teacherPassword" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <div id="teacherLoginError"></div>
+      <div class="btn-row" style="margin-top:20px;">
+        <button class="btn btn-primary" id="btnTeacherDoLogin" style="width:100%;justify-content:center;">เข้าสู่ระบบ</button>
+      </div>
+    </div>
+    <div id="teacherDashboard" class="teacher-body">
+      <div class="t-stats" id="tStats">
+        <div class="t-stat-card"><div class="t-stat-val" id="statTotal">—</div><div class="t-stat-label">ผู้เข้าสอบทั้งหมด</div></div>
+        <div class="t-stat-val gold" style="display:none" id="statAvgWrap"></div>
+        <div class="t-stat-card"><div class="t-stat-val gold" id="statAvg">—</div><div class="t-stat-label">คะแนนเฉลี่ย</div></div>
+        <div class="t-stat-card"><div class="t-stat-val safe" id="statPass">—</div><div class="t-stat-label">ผ่าน (≥60%)</div></div>
+        <div class="t-stat-card"><div class="t-stat-val alert" id="statDisq">—</div><div class="t-stat-label">ถูกตัดสิทธิ์</div></div>
+      </div>
+      <div class="t-controls">
+        <input class="t-filter-input" id="tSearch" placeholder="ค้นหาชื่อ / รหัส / ชั้น..." oninput="applyFilter()">
+        <select class="t-filter-select" id="tFilterClass" onchange="applyFilter()"><option value="">ทุกชั้น</option></select>
+        <select class="t-filter-select" id="tFilterStatus" onchange="applyFilter()">
+          <option value="">ทุกสถานะ</option>
+          <option value="pass">ผ่าน</option>
+          <option value="fail">ไม่ผ่าน</option>
+          <option value="disq">ถูกตัดสิทธิ์</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" onclick="loadResults()">↻ รีเฟรช</button>
+        <button class="btn btn-safe btn-sm" onclick="downloadCSV()" style="margin-left:auto">⬇ CSV</button>
+        <button class="btn btn-accent btn-sm" onclick="downloadExcel()">⬇ Excel</button>
+      </div>
+      <div class="t-table-wrap">
+        <div id="tLoadingRow" class="t-empty"><div class="spinner" style="margin:0 auto 12px;"></div>กำลังโหลด...</div>
+        <table class="t-table hidden" id="tTable">
+          <thead>
+            <tr>
+              <th onclick="sortBy('number')" id="th-number">เลขที่ <span class="sort-arrow">↕</span></th>
+              <th onclick="sortBy('student_id')" id="th-student_id">รหัส <span class="sort-arrow">↕</span></th>
+              <th onclick="sortBy('student_name')" id="th-student_name">ชื่อ-นามสกุล <span class="sort-arrow">↕</span></th>
+              <th onclick="sortBy('class')" id="th-class">ชั้น <span class="sort-arrow">↕</span></th>
+              <th onclick="sortBy('score')" id="th-score">คะแนน <span class="sort-arrow">↕</span></th>
+              <th onclick="sortBy('total_sec')" id="th-total_sec">เวลาใช้ <span class="sort-arrow">↕</span></th>
+              <th>สถานะ</th>
+              <th onclick="sortBy('submitted_at')" id="th-submitted_at">ส่งเมื่อ <span class="sort-arrow">↕</span></th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tBody"></tbody>
+        </table>
+        <div id="tEmptyRow" class="t-empty hidden">ไม่พบข้อมูลที่ตรงกับเงื่อนไข</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Student detail modal -->
+<div id="studentDetailModal">
+  <div class="detail-card">
+    <h3 id="detailName">ชื่อนักเรียน</h3>
+    <p class="detail-sub" id="detailSub">รหัส | ชั้น เลขที่</p>
+    <div class="score-summary" id="detailScoreSummary" style="margin-bottom:16px;"></div>
+    <table class="detail-q-table" id="detailQTable">
+      <thead><tr><th>ข้อ (ต้นฉบับ)</th><th>คำตอบ</th><th>เวลา</th><th>ผล</th></tr></thead>
+      <tbody id="detailQBody"></tbody>
+    </table>
+    <div class="btn-row" style="justify-content:center;margin-top:20px;">
+      <button class="btn btn-ghost" onclick="closeDetailModal()">ปิด</button>
+    </div>
+  </div>
+</div>
+
+<footer class="dev-note" id="devNote"></footer>
+
+<script>
+/* ════════════════════════════════════════════════════════════════
+   ระบบสอบออนไลน์ชีววิทยา
+   หัวข้อ: ลักษณะของสิ่งมีชีวิต + เคมีพื้นฐานของสิ่งมีชีวิต
+   40 ข้อ | เกณฑ์ผ่าน 60%
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── 1) SUPABASE CONFIG ── */
+const SUPABASE_URL  = 'https://zpsotjfeexsglbkbxlzf.supabase.co';
+const SUPABASE_ANON = 'sb_publishable_wCH6hIVAq-yNhP8eq69Nzw_3qBjec9v';
+let sbClient = null;
+try { sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON); } catch(e) {}
+
+/* ── 2) EXAM CONFIG ── */
+const CONFIG = {
+  examId:             'bio-q1',
+  examTitle:          'ชีววิทยา Q1',
+  examDurationSec:    50 * 60,    // 50 นาที
+  perQuestionSec:     45,         // 45 วินาทีต่อข้อ
+  passPercent:        60,         // เกณฑ์ผ่าน 60%
+  maxTabSwitch:       3,
+  maxFaceMissing:     3,
+  faceMissingGraceMs: 4000,
+  faceCheckIntervalMs:800,
+  requireFullscreen:  true,
+  shuffleQuestions:   true,
+  shuffleChoices:     true,
+};
+
+/* ── 3) QUESTIONS — 40 ข้อ ──
+   id 1-20   = ลักษณะของสิ่งมีชีวิต
+   id 21-40  = เคมีพื้นฐานของสิ่งมีชีวิต
+   topic: 'bio' | 'chem'
+*/
+const QUESTIONS_MASTER = [
+  { id:1, topic:'bio',
+    text:"ข้อใดเป็นลักษณะของสิ่งมีชีวิต",
+    choices:["สามารถเคลื่อนที่ได้ด้วยตัวเองเสมอ","มีการเจริญเติบโต","สังเคราะห์แสงได้ทุกชนิด","มีจำนวนเซลล์เท่ากันทุกชนิด"],
+    answerIndex:1 }, 
+  { id:2, topic:'bio',
+    text:"ข้อใดไม่ใช่ลักษณะของสิ่งมีชีวิต",
+    choices:["มีกระบวนการเมทาบอลิซึม","มีการตอบสนองต่อสิ่งเร้า", "มีการสึกกร่อนตามธรรมชาติ","มีการสืบพันธุ์"],
+    answerIndex:2 },
+  { id:3, topic:'bio',
+    text:"หน่วยพื้นฐานที่เล็กที่สุดของสิ่งมีชีวิตคือข้อใด",
+    choices:["เนื้อเยื่อ","เซลล์","อวัยวะ","ระบบอวัยวะ"],
+    answerIndex:1 },
+  { id:4, topic:'bio',
+    text:"ข้อใดไม่ใช่การเจริญเติบโตของสิ่งมีชีวิต",
+    choices:["มีการเพิ่มจำนวน (cell division)","มีการเพิ่มขนาด (cell enlargement)","มีการเปลี่ยนแปลงเพื่อทำหน้าที่บางอย่าง (differentiation)","มีการตอบสนองต่อสิ่งเร้า (Response)"],
+    answerIndex:3 },
+  { id:5, topic:'bio',
+    text:"กระบวนการในข้อใดจัดเป็นแคทาบอลิซึม (catabolism)",
+    choices:["การสังเคราะห์ด้วยแสง","การสังเคราะห์โปรตีน","การย่อยอาหาร","การสะสมไกลโคเจน"],
+    answerIndex:2 },
+  { id:6, topic:'bio',
+    text:"ข้อใดอธิบายการรักษาดุลยภาพ (Homeostasis) ได้ถูกต้องที่สุด",
+    choices:["การเพิ่มจำนวนเซลล์เพื่อซ่อมแซมร่างกาย","การรักษาสภาพแวดล้อมภายในร่างกายให้คงที่","การกำจัดสิ่งแปลกปลอมออกจากร่างกาย","การถ่ายทอดลักษณะทางพันธุกรรม"],
+    answerIndex:1 },
+  { id:7, topic:'bio',
+    text:"Physiolgy เป็นการศึกษาเกี่ยวกับอะไร",
+    choices:["การถ่ายทอดลักษณะทางพันธุกรรม","การตอบสนองต่อสิ่งเร้า","การเปลี่ยนแปลงจากอดีตสู่ปัจจุบัน","การทำงานของอวัยวะต่าง ๆ"],
+    answerIndex:3 },
+  { id:8, topic:'bio',
+    text:"การงอกใหม่ (Regeneration) ของหางตุ๊กแก จัดเป็นลักษณะของสิ่งมีชีวิตในข้อใดและแตกต่างจากการสืบพันธุ์อย่างไร",
+    image:{ url:"https://eschooltoday.com/learn/wp-content/uploads/2021/02/asexual-reproduction-regeneration-gecko.jpg", caption:"การงอกใหม่ของหางตุ๊กแก" },
+    choices:["เป็นการตอบสนองต่อสิ่งเร้า โดยมีกลไกฮอร์โมนควบคุมให้หางยาวเท่าเดิมได้","เป็นการสืบพันธุ์แบบไม่อาศัยเพศ เพราะได้ชิ้นสวนร่างกายเพิ่มขึ้น","เป็นการเจริญเติบโตและการซ่อมแซมเนื้อเยื่อ เพราะไม่ได้เพิ่มจำนวนของสิ่งมีชีวิต","เป็นการปรับตัวทางพฤติรรม เพื่อพรางตัวจากผู้ล่า"],
+    answerIndex:2 },
+  { id:9, topic:'bio',
+    text:"หลักจริยธรรม '3Rs' ในการใช้สัตว์ทดลองประกอบด้วยอะไรบ้าง",
+    choices:["Research, Result, Report", "Reuse, Recycle, Reduce", "Replacement, Reduction, Refinement", "Respect, Responsibility, Right"],
+    answerIndex:2 },
+  { id:10, topic:'bio',
+    text:"ขั้นตอนของการศึกษาวิทยาศาสตร์ต่อไปนี้ ข้อใดที่เป็นข้อที่จะนำไปสู่การสรุปผลและการศึกษาต่อไป",
+    choices:["การสังเกตและตั้งปัญหา/คำถาม","การเก็บรวบรวมข้อมูลและวิเคราะห์ผลการทดลอง","การสรุปและอภิปรายผลการทดลอง","การตั้งสมมติฐานและออกแบบการทดลอง"],
+    answerIndex:1 },
+  { id:11, topic:'bio',
+    text:"จากการทดลองนี้ ตัวแปรต้น และตัวแปรตามคือข้อใด ตามลำดับ",
+    image:{ url:"https://drive.google.com/file/d/1BDk4lxOyUqAXEfxEAbNloi897F3txeQW", caption:"การทดลองเพื่อศึกษาการเจริญเติบโตของยีสต์ในสารละลายน้ำตาล" },
+    choices:["ความเข้มข้นของสารละลายน้ำตาล, ปริมาณยีสต์","ความเข้มข้นของสารละลายน้ำตาล, ปริมาณแก๊สคาร์บอนไดออกไซด์","ปริมาณแก๊สคาร์บอนไดออกไซด์, ปริมาณยีสต์","ปริมาณสารละลายน้ำตาล, ปริมาณยีสต์"],
+    answerIndex:1 },
+  { id:12, topic:'bio',
+    text:"ในระดับการจัดระบบของสิ่งมีชีวิต (Biological Organization) ข้อใดเรียงลำดับจากระดับย่อยไปหาระดับใหญ่ได้ถูกต้อง",
+    choices:["เนื้อเยื่อ → เซลล์ → ระบบอวัยวะ → อวัยวะ → ร่างกายสิ่งมีชีวิต",
+              "เซลล์ → เนื้อเยื่อ → อวัยวะ → ระบบอวัยวะ → ร่างกายสิ่งมีชีวิต",
+              "เซลล์ → เนื้อเยื่อ → ระบบอวัยวะ → อวัยวะ → ร่างกายสิ่งมีชีวิต",
+              "เซลล์ → เนื้อเยื่อ → ร่างกายสิ่งมีชีวิต → อวัยวะ → ระบบอวัยวะ"],
+    answerIndex:1 },
+  { id:13, topic:'bio',
+    text:"นักเรียนคนหนึ่งต้องการศึกษาว่า 'ปุ๋ยคอกชนิดต่างๆ ส่งผลต่อความสูงของต้นมะลิแตกต่างกันหรือไม่' ขั้นตอนแรกที่เขาควรทำในกระบวนการวิทยาศาสตร์คืออะไร",
+    choices:["ตั้งสมมติฐานว่าปุ๋ยขี้ไก่ทำให้ต้นมะลิโตเร็วที่สุด","การระบุปัญหาให้ชัดเจนจากการสังเกต","สรุปผลการทดลองว่าปุ๋ยคอกดีกว่าปุ๋ยเคมี","ออกแบบการทดลองโดยเตรียมต้นมะลิ 20 ต้น"],
+    answerIndex:1 },
+  { id:14, topic:'bio',
+    text:"สมมติฐานทางวิทยาศาสตร์ (Scientific hypothesis) ที่ดี ควรมีลักษณะสำคัญอย่างไร",
+    choices:["ต้องสอดคล้องกับความเชื่อส่วนบุคคลของผู้วิจัยเสมอ","ต้องเขียนให้ยาวและครอบคลุมความรู้ชีววิทยาทุกเรื่อง","ต้องเป็นความจริงแท้แน่นอนที่ไม่สามารถหักล้างได้ในอนาคต","ต้องสามารถตรวจสอบได้ด้วยการทดลองหรือการสังเกต"],
+    answerIndex:3 },
+  { id:15, topic:'bio',
+    text:"การเรียงลำดับขั้นตอนของระเบียบวิธีทางวิทยาศาสตร์ (Scientific method) ในข้อใดเหมาะสมและมีประสิทธิภาพที่สุดในการค้นหาความรู้ใหม่",
+    choices:["ตั้งสมมติฐาน → ทดลอง → สังเกตและตั้งปัญหา → วิเคราะห์ข้อมูล → สรุปผล",
+            "สรุปผล → ตั้งสมมติฐาน → ทดลอง → สังเกตและตั้งปัญหา → วิเคราะห์ข้อมูล",
+            "สังเกตและตั้งปัญหา → ตั้งสมมติฐาน → ออกแบบและทดลอง → วิเคราะห์ข้อมูล → สรุปผล",
+            "สังเกตและตั้งปัญหา → วิเคราะห์ข้อมูล → สรุปผล → ตั้งสมมติฐาน → ทดลอง"],
+    answerIndex:2 },
+  { id:16, topic:'bio',
+    text:"นักวิจัยสังเกตว่า 'ต้นทานตะวันในทุ่งจะหันดอกเข้าหาทิศตะวันออกในตอนเช้าเสมอ' พฤติกรรมนี้แสดงถึงลักษณะของสิ่งมีชีวิตในข้อใดเด่นชัดที่สุด",
+    choices:["การตอบสนองต่อสิ่งเร้า","การรักษาดุลยภาพ","กระบวนการเมทาบอลิซึม","การสืบพันธุ์"],
+    answerIndex:0 },
+  { id:17, topic:'chem',
+    text:"จากภาพจงระบุจำนวนโปรตรอน นิวตรอน และเวเลนซ์อิเลกตรอนของอะตอมคาร์บอน ตามลำดับ",
+    image:{ url:"https://drive.google.com/file/d/1VFQeydu4BS9QMGKRGQaZpmkGz1u5txwZ", caption:"สัญลักษณ์ธาตุและภาพแสดงอะตอมคาร์บอน" },
+    choices:["6 4 4","6 4 6","12 6 6","6 6 4"],
+    answerIndex:3 },
+  { id:18, topic:'chem',
+    text:"จากภาพบริเวณที่ลูกศรชี้แสดงถึงอะไร",
+    image:{ url:"https://drive.google.com/file/d/19WpNVXJ0L8M9nXE-jFL1bMp7JSPYEksm"},
+    choices:["พันธะโคเวเลนต์","พันธะไฮโดรเจน","พันธะไอออนิก","พันธะระหว่างอะตอม"],
+    answerIndex:1 },
+  { id:19, topic:'chem',
+    text:"จากภาพไอออนตรงกลางเป็นไอออนชนิดใด",
+    image:{ url:"https://drive.google.com/file/d/18KLaGNT-XxPx-dJcnXvU2ErWuKcy6laf", caption:"การละลายสาร" },
+    choices:["ไอออนบวก","ไอออนลบ","ไอออนกลาง","ไอออนไนซ์"],
+    answerIndex:0 },
+  { id:20, topic:'chem',
+    text:"ข้อใดอธิบายความหมายของคำว่า 'ไฮโดรโฟบิก (Hydrophobic)' ได้ถูกต้องที่สุด",
+    choices:["คุณสมบัติของสารที่มีประจุไฟฟ้าสูง ทำให้อุ้มน้ำได้ดีมาก",
+    "ปฏิกิริยาเคมีที่โมเลกุลของน้ำแตกตัวออกเป็นไฮโดรเจนและออกซิเจน",
+    "แรงดึงดูดระหว่างโมเลกุลของน้ำกับแก้วที่ทำให้เกิดปรากฏการณ์น้ำล้นขอบ",
+    "คุณสมบัติของโมเลกุลที่ไม่มีขั้ว ซึ่งไม่สามารถสร้างพันธะไฮโดรเจนกับน้ำได้ จึงไม่ละลายน้ำ"],
+    answerIndex:3 },
+  { id:21, topic:'chem',
+    text:"ร่างกายของมนุษย์ประกอบด้วยน้ำประมาณ 60-70% คุณสมบัติข้อใดของน้ำที่ช่วยให้ร่างกายของเราสามารถรักษาอุณหภูมิให้คงที่ได้ดี แม้สภาพแวดล้อมภายนอกจะร้อนหรือหนาวอย่างรวดเร็ว",
+    choices:["น้ำมีความตึงผิวต่ำมาก ทำให้อากาศร้อนผ่านทะลุร่างกายไปได้โดยไม่สะสม",
+    "น้ำเป็นโมเลกุลไม่มีขั้ว จึงไม่นำความร้อนเข้าสู่เซลล์ชั้นใน",
+    "น้ำสามารถเยือกแข็งได้ง่ายที่อุณหภูมิห้องเพื่อกักเก็บพลังงานส่วนเกิน",
+    "น้ำมีความจุความร้อนจำเพาะสูง ทำให้ต้องใช้พลังงานมากในการเปลี่ยนอุณหภูมิ"],
+    answerIndex:3 },
+  { id:22, topic:'chem',
+    text:"จากภาพเป็นหมู่ฟังก์ชันใด",
+    image:{ url:"https://drive.google.com/file/d/1XSV0n34sKR8S0WZy-UjjYAXd5fGl-DwH"},
+    choices:["คาร์บอนิล","คาร์บอกซิล","ไฮดรอกซิล","ฟอสเฟต"],
+    answerIndex:1 },
+  { id:23, topic:'chem',
+    text:"พันธะเคมีที่เชื่อมต่อระหว่างหน่วยย่อยของโมโนแซ็กคาไรด์ (Monosaccharide) จนกลายเป็นไดแซ็กคาไรด์หรือพอลิแซ็กคาไรด์ คือพันธะประเภทใด",
+    choices:["พันธะฟอสโฟไดเอสเทอร์ (Phosphodiester bond)","พันธะเปปไทด์ (Peptide bond)","พันธะเอสเทอร์ (Ester bond)","พันธะไกลโคซิดิก (Glycosidic bond)"],
+    answerIndex:3 },
+  { id:24, topic:'chem',
+    text:"โมโนเมอร์ (Monomer) ของคาร์โบไฮเดรตคือข้อใด",
+    choices:["กรดไขมัน (Fatty acid)","กรดอะมิโน (Amino acid)","โมโนแซ็กคาไรด์ (Monosaccharide)","นิวคลีโอไทด์ (Nucleotide)"],
+    answerIndex:2 },
+  { id:25, topic:'chem',
+    text:"การทำปฏิกิริยาขจัดน้ำออก (Dehydration) เพื่อสร้างพันธะระหว่างน้ำตาลโมเลกุลเดี่ยวสองโมเลกุล จะส่งผลต่อสูตรโมเลกุลของสารอย่างไร หากนำเฮกโซส ($C_6H_{12}O_6$) สองโมเลกุลมาต่อกัน",
+    choices:["สูตรโมเลกุลจะเป็น $C_6H_{12}O_6$ เท่าเดิมเนื่องจากคาร์บอนบางส่วนระเหยไป",
+    "สูตรโมเลกุลจะเป็น $C_{12}H_{20}O_{10}$ เนื่องจากสูญเสียแก๊สออกซิเจนและไฮโดรเจนแยกกัน",
+    "สูตรโมเลกุลจะเป็น $C_{12}H_{24}O_{12}$ เนื่องจากรวมกันตรงๆ",
+    "สูตรโมเลกุลจะเป็น $C_{12}H_{22}O_{11}$ เนื่องจากสูญเสียน้ำ ($H_2O$) ไป 1 โมเลกุล"],
+    answerIndex:3 },
+  { id:26, topic:'chem',
+    text:"ปฏิกิริยาในภาพเรียกว่าอะไร",
+    image:{ url:"https://drive.google.com/file/d/13sK5okuEy7n1G-FvLi-ECl-AMN-HXsOh"},
+    choices:["dehydration","hydrolysis","combusion","neutralization"],
+    answerIndex:0 },
+  { id:27, topic:'chem',
+    text:"น้ำตาลโมเลกุลคู่ในข้อใด เกิดจากหน่วยย่อยของโมโนแซ็กคาไรด์ชนิดเดียวกันมาเชื่อมต่อกัน",
+    choices:["เซลโลไบโอส (Cellobiose)","ซูโครส (Sucrose)","มอลโทส (Maltose)","แลกโทส (Lactose)"],
+    answerIndex:2 },
+  { id:28, topic:'chem',
+    text:"โครงสร้างของพอลิแซ็กคาไรด์สะสมประเภท 'อะไมโลส' (Amylose) และ 'ไกลโคเจน' (Glycogen) มีความเหมือนหรือความแตกต่างกันอย่างไรในแง่ของโครงสร้างโมเลกุลระดับมหภาค",
+    choices:["อะไมโลสเชื่อมต่อหน่วยย่อยด้วยพันธะชนิดเบตา ส่วนไกลโคเจนเชื่อมต่อหน่วยย่อยทั้งหมดด้วยพันธะเคมีชนิดแอลฟา",
+    "อะไมโลสประกอบขึ้นมาจากหน่วยย่อยฟรักโทส ส่วนไกลโคเจนประกอบขึ้นมาจากหน่วยย่อยกลูโคสเรียงต่อกันสามมิติ",
+    "อะไมโลสเป็นพอลิเมอร์สายตรงที่ไม่มีกิ่งก้าน ส่วนไกลโคเจนเป็นพอลิเมอร์ที่มีการแตกกิ่งก้านถี่และหนาแน่นสูงมาก",
+    "อะไมโลสเป็นพอลิเมอร์ที่มีการแตกกิ่งก้านหนาแน่น ส่วนไกลโคเจนเป็นพอลิเมอร์สายตรงยาวต่อเนื่องไม่มีกิ่งก้าน"],
+    answerIndex:2 },
+  { id:29, topic:'chem',
+    text:"ภาพด้านล่างเป็นโครงสร้าง polysaccharide ชนิดหนึ่ง บริเวณที่ไฮไลท์เป็นพันธะแบบใด",
+    image:{ url:"https://drive.google.com/file/d/1G9sWPssjbLrhuZu9Cv0EYCKas2PG6m5B"},
+    choices:["พันธะแอลฟา-1,4-ไกลโคซิดิก ($\alpha$-1,4-glycosidic bond)",
+    "พันธะเบตา-1,4-ไกลโคซิดิก ($\beta$-1,4-glycosidic bond)",
+    "พันธะแอลฟา-1,6-ไกลโคซิดิก ($\alpha$-1,6-glycosidic bond)",
+    "พันธะเบตา-1,6-ไกลโคซิดิก ($\beta$-1,6-glycosidic bond)"],
+    answerIndex:1 },
+  { id:30, topic:'chem',
+    text:"กรดอะมิโน (Amino acid) ทุกชนิดที่เป็นหน่วยย่อยของโปรตีน จะมีโครงสร้างพื้นฐานที่เหมือนกันจับอยู่กับแอลฟาคาร์บอน ยกเว้นส่วนใดที่ทำให้กรดอะมิโนแต่ละชนิดมีสมบัติทางเคมีที่แตกต่างกัน",
+    choices:["หมู่คาร์บอกซิล (Carboxyl group) ที่ทำหน้าที่แสดงสมบัติเป็นกรดในสารละลาย",
+    "หมู่โซ่ข้าง (Side chain หรือ R-group) ที่มีความหลากหลายทางโครงสร้างเคมี",
+    "หมู่แอมิโน (Amino group) ที่ทำหน้าที่แสดงสมบัติเป็นเบสในสารละลาย",
+    "อะตอมของไฮโดรเจน (Hydrogen atom) ที่จับโดยตรงกับแอลฟาคาร์บอนหลัก"],
+    answerIndex:1 },
+  { id:31, topic:'chem',
+    text:"การสร้างพันธะเพปไทด์ (Peptide bond) ระหว่างกรดอะมิโนสองโมเลกุล เกิดขึ้นจากการทำปฏิกิริยา dehydration ระหว่างหมู่ฟังก์ชันใดของกรดอะมิโนทั้งสองตามลำดับ",
+    choices:["หมู่แอมิโนของกรดอะมิโนตัวแรก กับ หมู่โซ่ข้างของกรดอะมิโนตัวที่สอง",
+    "หมู่คาร์บอกซิลของกรดอะมิโนตัวแรก กับ หมู่แอมิโนของกรดอะมิโนตัวที่สอง",
+    "หมู่คาร์บอกซิลของกรดอะมิโนตัวแรก กับ หมู่คาร์บอกซิลของกรดอะมิโนตัวที่สอง",
+    "หมู่โซ่ข้างของกรดอะมิโนตัวแรก กับ หมู่แอมิโนของกรดอะมิโนตัวที่สอง"],
+    answerIndex:1 },
+  { id:32, topic:'chem',
+    text:"โปรตีนฮีโมโกลบิน (Hemoglobin) ที่ทำหน้าที่ขนส่งออกซิเจนในกระแสเลือด จัดเป็นโปรตีนที่มีโครงสร้างในระดับใด และมีลักษณะการจัดเรียงตัวของโมเลกุลอย่างไร",
+    choices:["โครงสร้างจตุรภูมิ เกิดจากสายพอลิเพปไทด์มากกว่าหนึ่งสายมาทำงานร่วมกัน",
+    "โครงสร้างทุติยภูมิ เกิดจากโครงสร้างแผ่นพับเบตาหลายแผ่นเรียงซ้อนขนานกัน",
+    "โครงสร้างปฐมภูมิ เกิดจากการเรียงลำดับกรดอะมิโนสายยาวเหยียดตรงไม่มีการม้วน",
+    "โครงสร้างตติยภูมิ เกิดจากสายพอลิเพปไทด์เพียงสายเดียวม้วนตัวเป็นก้อนกลม"],
+    answerIndex:0 },
+  { id:33, topic:'chem',
+    text:"กรดอะมิโนชนิดจำเพาะในข้อใด จัดเป็นกรดอะมิโนจำเป็น (Essential amino acid) ที่ร่างกายมนุษย์ในวัยผู้ใหญ่ไม่สามารถสังเคราะห์ขึ้นเองได้ และต้องได้รับจากการรับประทานอาหารเท่านั้น",
+    choices:["ไกลซีน (Glycine) และ อะลานีน (Alanine)",
+    "แอสพาราจีน (Asparagine) และ ไทโรซีน (Tyrosine)",
+    "ไลซีน (Lysine) และ เมทิโอนีน (Methionine)",
+    "กรดกลูตามิก (Glutamic acid) และ ซีรีน (Serine)"],
+    answerIndex:2 },
+  { id:34, topic:'chem',
+    text:"โครงสร้างของสารเคมีใดที่สามารถสร้างพันธะเปปไทด์ได้",
+    image:{ url:"https://drive.google.com/file/d/1c4lnxE9vdNMtMp4nGAiEYDC5Z4aaD7OF"},
+    choices:["A","B","C","D"],
+    answerIndex:1 },
+  { id:35, topic:'chem',
+    text:"สารที่มีโครงสร้างดังรูปเป็นสารประเภทใด",
+    image:{ url:"https://drive.google.com/file/d/10pQexwYsg5BQ2bUHORw_Esxtjn2CK-Jh"},
+    choices:["น้ำตาล pentose และ hexose","น้ำตาล pentose และ น้ำตาลกลุ่ม aldehyde","น้ำตาล pentose และ น้ำตาลกลุ่ม ketone","น้ำตาล hexose และ น้ำตาลกลุ่ม ketone"],
+    answerIndex:3 },
+  { id:36, topic:'chem',
+    text:"เพปไทด์ที่ประกอบด้วยกรดแอมิโน 4 ชนิด ชนิดละ 1 หน่วย จะสามารถมีสายเพปไทด์ที่มีลำดับกรดแอมิโนที่แตกต่างกันได้กี่แบบ",
+    choices:["8","16","24","120"],
+    answerIndex:2 },
+  { id:37, topic:'chem',
+    text:"พอลีเพปไทด์สายหนึ่งเกิดจากกรดอะมิโนจำนวน 100 โมเลกุลต่อกัน จะมีจำนวนพันธะเพปไทด์เท่าใด",
+    choices:["100","101","99","98"],
+    answerIndex:2 },
+  { id:38, topic:'chem',
+    text:"เวลาที่เรากินเนื้อไก่ เนื้อหมู หรือไข่ต้ม ร่างกายจะย่อยโปรตีนเหล่านั้นจนกลายเป็นโมเลกุลขนาดเล็กที่สุดเพื่อดูดซึมเข้าสู่ร่างกาย โมเลกุลขนาดเล็กที่เป็น 'หน่วยย่อยที่สุดของโปรตีน' นี้เรียกว่าอะไร",
+    choices:["กรดไขมัน (Fatty acid)","กรดอะมิโน (Amino acid)","โมโนแซ็กคาไรด์ (Monosaccharide)","นิวคลีโอไทด์ (Nucleotide)"],
+    answerIndex:1 },
+  { id:39, topic:'chem',
+    text:"ข้อใดเป็นตัวอย่างของพอลิแซ็กคาไรด์ (Polysaccharide)",
+    choices:["กลูโคสและฟรักโตส","ซูโครสและแลกโทส","แป้งและเซลลูโลส","กลีเซอรอลและกรดไขมัน"],
+    answerIndex:2 },
+  { id:40, topic:'chem',
+    text:"ข้อใดต่อไปนี้จัดเป็นบทบาทหน้าที่ของโปรตีนประเภท 'ป้องกัน (Defense protein)' ที่ช่วยให้ร่างกายแข็งแรงและไม่เจ็บป่วยได้ง่าย",
+    choices:["การสร้างแอนติบอดีมาดักจับเชื้อโรคที่เข้าสู่ร่างกาย","การสะสมพลังงานในรูปของไขมันใต้ผิวหนัง","การกระตุ้นให้ร่างกายรู้สึกหิวเมื่อขาดน้ำตาล","การย่อยอาหารพวกแป้งในปากโดยน้ำลาย"],
+    answerIndex:0 },
+];
+
+/* ════ SHUFFLE ════ */
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+function buildShuffledExam() {
+  let order = QUESTIONS_MASTER.map((_, i) => i);
+  if (CONFIG.shuffleQuestions) order = shuffle(order);
+  return order.map(origIdx => {
+    const q = QUESTIONS_MASTER[origIdx];
+    let choiceOrder = q.choices.map((_, i) => i);
+    if (CONFIG.shuffleChoices) choiceOrder = shuffle(choiceOrder);
+    const shuffledChoices = choiceOrder.map(op => q.choices[op]);
+    const newAns = choiceOrder.indexOf(q.answerIndex);
+    return { id:q.id, originalId:q.id, topic:q.topic, text:q.text, image:q.image||null,
+             choices:shuffledChoices, answerIndex:newAns, choiceMap:choiceOrder };
+  });
+}
+let QUESTIONS = [];
+
+/* ── STATE ── */
+const state = {
+  student:{id:'',name:'',class:'',number:''},
+  camStream:null, faceModelReady:false,
+  examStarted:false, examEnded:false, current:0, answers:{},
+  remainingSec:CONFIG.examDurationSec, timerInterval:null, examStartTime:null,
+  qStartTime:null, qTimeSpent:{}, qTimerRAF:null,
+  tabSwitchCount:0, faceMissingCount:0,
+  faceMissingTimerStart:null, faceCurrentlyMissing:false, faceDetectInterval:null,
+  eventLog:[],
+};
+function logEvent(type, message) {
+  const entry = {type, message, timestamp:new Date().toISOString()};
+  state.eventLog.push(entry);
+  try { localStorage.setItem('exam_event_log', JSON.stringify(state.eventLog)); } catch(e) {}
+  return entry;
+}
+const $ = id => document.getElementById(id);
+
+/* ── INIT ── */
+function initApp() {
+  $('tabMaxText').textContent  = CONFIG.maxTabSwitch;
+  $('faceMaxText').textContent = CONFIG.maxFaceMissing;
+  $('ruleFaceMax').textContent = CONFIG.maxFaceMissing;
+  $('ruleTabMax').textContent  = CONFIG.maxTabSwitch;
+  const ok = !SUPABASE_URL.includes('YOUR_PROJECT');
+  $('devNote').innerHTML = ok
+    ? `Supabase: <span style="color:var(--safe)">${SUPABASE_URL}</span> | exam: ${CONFIG.examId} | ${QUESTIONS_MASTER.length} ข้อ | ผ่าน ${CONFIG.passPercent}%`
+    : `<span style="color:var(--alert)">⚠ ยังไม่ได้ตั้งค่า Supabase</span>`;
+  logEvent('system','โหลดหน้าสอบสำเร็จ');
+}
+
+/* ── REGISTRATION ── */
+function setFieldError(fieldId, show) {
+  const el=$(fieldId); if(!el) return;
+  if(show) el.classList.add('has-error'); else el.classList.remove('has-error');
+}
+function validateReg() {
+  const sid=$('inputStudentId').value.trim(), sname=$('inputStudentName').value.trim(),
+        scls=$('inputClass').value, snum=$('inputNumber').value.trim();
+  let ok=true;
+  setFieldError('fieldStudentId', sid.length<3);   if(sid.length<3) ok=false;
+  setFieldError('fieldStudentName', sname.length<2); if(sname.length<2) ok=false;
+  setFieldError('fieldClass', scls==='');            if(scls==='') ok=false;
+  setFieldError('fieldNumber', !snum||+snum<=0||+snum>50); if(!snum||+snum<=0||+snum>50) ok=false;
+  return ok;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  $('btnRegNext').addEventListener('click', function() {
+    if(!validateReg()) return;
+    state.student = { id:$('inputStudentId').value.trim(), name:$('inputStudentName').value.trim(),
+                      class:$('inputClass').value, number:parseInt($('inputNumber').value) };
+    logEvent('system','ลงทะเบียน: '+state.student.name);
+    $('regScreen').classList.add('hidden');
+    $('gateScreen').classList.remove('hidden');
+  });
+  $('btnBack').addEventListener('click', function() {
+    $('gateScreen').classList.add('hidden'); $('regScreen').classList.remove('hidden');
+  });
+  $('btnRequestCam').addEventListener('click', requestCamera);
+  $('btnStartExam').addEventListener('click', startExam);
+});
+
+/* ── CAMERA ── */
+async function requestCamera() {
+  const camItem=$('gateCamItem'), camSub=$('gateCamSub');
+  try {
+    state.camStream = await navigator.mediaDevices.getUserMedia({video:{width:320,height:240,facingMode:'user'},audio:false});
+    $('gateCamPreview').srcObject = state.camStream;
+    camItem.classList.add('ok'); camItem.classList.remove('fail');
+    camSub.textContent = 'อนุญาตแล้ว';
+    $('camDot').className='status-dot live'; $('camStatusText').textContent='พร้อมใช้งาน';
+    logEvent('system','อนุญาตกล้องสำเร็จ');
+    await loadFaceModel(); startGateFaceCheck();
+  } catch(err) {
+    camItem.classList.add('fail'); camItem.classList.remove('ok');
+    camSub.textContent = 'ถูกปฏิเสธ — กรุณาอนุญาตกล้องแล้วลองใหม่';
+    $('camStatusText').textContent='ถูกปฏิเสธ';
+    logEvent('system','ปฏิเสธกล้อง:'+err.message);
+  }
+  evaluateGateReady();
+}
+
+/* ── FACE MODEL ── */
+async function waitForFaceApi(maxMs) {
+  const start=Date.now();
+  return new Promise((resolve,reject)=>{
+    function check() {
+      if(typeof faceapi!=='undefined'&&faceapi.nets){resolve();return;}
+      if(Date.now()-start>maxMs){reject(new Error('faceapi timeout'));return;}
+      setTimeout(check,100);
+    }
+    check();
+  });
+}
+async function loadFaceModel() {
+  if(state.faceModelReady) return;
+  try {
+    await waitForFaceApi(10000);
+    await faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/');
+    state.faceModelReady=true; logEvent('system','โหลดโมเดลใบหน้าสำเร็จ');
+  } catch(err) {
+    logEvent('system','โหลดโมเดลล้มเหลว:'+err.message);
+    if($('gateFaceSub')) $('gateFaceSub').textContent='โหลดโมเดลล้มเหลว';
+  }
+}
+let gateFaceInterval=null;
+function startGateFaceCheck() {
+  if(gateFaceInterval) clearInterval(gateFaceInterval);
+  gateFaceInterval = setInterval(async()=>{
+    if(!state.faceModelReady||$('gateScreen').classList.contains('hidden')) return;
+    const det = await faceapi.detectSingleFace($('gateCamPreview'),new faceapi.TinyFaceDetectorOptions());
+    const fi=$('gateFaceItem'), fs=$('gateFaceSub');
+    if(det){fi.classList.add('ok');fi.classList.remove('fail');fs.textContent='ตรวจพบใบหน้าชัดเจน';}
+    else   {fi.classList.add('fail');fi.classList.remove('ok');fs.textContent='ยังไม่พบใบหน้า';}
+    evaluateGateReady();
+  },700);
+}
+function evaluateGateReady() {
+  $('btnStartExam').disabled = !($('gateCamItem').classList.contains('ok')&&$('gateFaceItem').classList.contains('ok'));
+}
+
+/* ── START EXAM ── */
+async function startExam() {
+  if(gateFaceInterval) clearInterval(gateFaceInterval);
+  QUESTIONS = buildShuffledExam();
+  logEvent('system',`สุ่มข้อสอบแล้ว:[${QUESTIONS.map(q=>q.originalId).join(',')}]`);
+  state.examStarted=true; state.examStartTime=Date.now();
+  $('examCamVideo').srcObject=state.camStream;
+  $('camMonitor').classList.remove('hidden');
+  $('gateScreen').classList.add('hidden');
+  $('examScreen').style.display='block';
+  if(CONFIG.requireFullscreen){try{await document.documentElement.requestFullscreen();}catch(e){}}
+  buildQGrid(); openQuestion(0); startTotalTimer(); startTabSwitchWatcher(); startExamFaceWatcher();
+  logEvent('system','เริ่มทำข้อสอบ');
+}
+
+/* render math ($...$) ใน element ถ้า KaTeX พร้อม */
+function renderMath(el){
+  if(typeof renderMathInElement === 'function'){
+    try{
+      renderMathInElement(el,{
+        delimiters:[
+          {left:'$$',right:'$$',display:true},
+          {left:'$',right:'$',display:false},
+        ],
+        throwOnError:false,
+      });
+    }catch(e){}
+  }
+}
+
+/* ── TOTAL TIMER ── */
+function startTotalTimer() {
+  updateTotalTimerDisplay();
+  state.timerInterval = setInterval(()=>{
+    state.remainingSec--;
+    updateTotalTimerDisplay();
+    if(state.remainingSec<=0){clearInterval(state.timerInterval);finishExam('timeout');}
+  },1000);
+}
+function updateTotalTimerDisplay() {
+  const m=Math.floor(state.remainingSec/60).toString().padStart(2,'0');
+  const s=(state.remainingSec%60).toString().padStart(2,'0');
+  const el=$('examTimer'); el.textContent=`${m}:${s}`;
+  el.classList.toggle('crit',state.remainingSec<=120);
+}
+
+/* ── PER-QUESTION TIMER ── */
+function openQuestion(idx) {
+  if(state.qStartTime!==null&&state.current!==null) accumulateQTime(state.current);
+  state.current=idx; state.qStartTime=Date.now();
+  renderQuestion(); startQTimerBar();
+}
+function accumulateQTime(idx) {
+  if(state.qStartTime===null) return;
+  state.qTimeSpent[idx]=(state.qTimeSpent[idx]||0)+(Date.now()-state.qStartTime)/1000;
+  state.qStartTime=null;
+}
+function startQTimerBar() {
+  cancelAnimationFrame(state.qTimerRAF);
+  function tick() {
+    if(!state.examStarted||state.examEnded) return;
+    const elapsed=state.qStartTime?(Date.now()-state.qStartTime)/1000:0;
+    const spent=(state.qTimeSpent[state.current]||0)+elapsed;
+    const pct=Math.max(0,Math.min(100,(1-spent/CONFIG.perQuestionSec)*100));
+    const fill=$('qTimerBarFill'), label=$('qTimerBarLabel'), qd=$('qTimerDisplay');
+    fill.style.width=pct+'%';
+    fill.className='q-timer-bar-fill'+(pct<20?' crit':pct<40?' warn':'');
+    label.className='q-timer-label'+(pct<20?' crit':'');
+    label.textContent=fmtSec(Math.ceil(spent));
+    qd.textContent=fmtSec(Math.ceil(spent));
+    qd.classList.toggle('crit',pct<20);
+    state.qTimerRAF=requestAnimationFrame(tick);
+  }
+  state.qTimerRAF=requestAnimationFrame(tick);
+}
+function fmtSec(s){return`${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;}
+
+/* ── RENDER QUESTION ── */
+function buildQGrid() {
+  const grid=$('qGrid'); grid.innerHTML='';
+  QUESTIONS.forEach((_,i)=>{
+    const d=document.createElement('div');
+    d.className='q-grid-item'; d.id='grid-'+i;
+    d.innerHTML=`${i+1}<span class="q-spent-dot"></span>`;
+    d.onclick=()=>openQuestion(i);
+    grid.appendChild(d);
+  });
+}
+function renderQuestion() {
+  const q=QUESTIONS[state.current];
+  $('qCounter').textContent=`ข้อ ${state.current+1} / ${QUESTIONS.length}`;
+  $('qText').textContent=q.text;
+  $('progressFill').style.width=`${((state.current+1)/QUESTIONS.length)*100}%`;
+
+  // Topic badge
+  const badge=$('topicBadge');
+  if(q.topic==='bio'){badge.className='topic-badge bio';badge.textContent='🔬 ลักษณะของสิ่งมีชีวิต';}
+  else{badge.className='topic-badge chem';badge.textContent='⚗ เคมีพื้นฐานของสิ่งมีชีวิต';}
+
+  // Image
+  const imgWrap=$('qImageWrap');
+  if(q.image&&q.image.url){
+    imgWrap.classList.remove('hidden');
+    imgWrap.innerHTML=`<img src="${q.image.url}" alt="ภาพประกอบข้อ ${state.current+1}" loading="lazy" onerror="this.parentElement.innerHTML='<div style=\\'padding:16px;color:var(--paper-dim);font-size:13px;\\'>⚠ โหลดรูปภาพไม่สำเร็จ</div>'">${q.image.caption?`<div class="q-image-caption">📷 ${q.image.caption}</div>`:''}`;
+  } else {imgWrap.classList.add('hidden');imgWrap.innerHTML='';}
+
+  // Choices
+  const wrap=$('qChoices'); wrap.innerHTML='';
+  ['ก','ข','ค','ง'].forEach((L,idx)=>{
+    const div=document.createElement('div');
+    div.className='choice'+(state.answers[state.current]===idx?' selected':'');
+    div.innerHTML=`<span class="letter">${L}</span><span class="ctext"></span>`;
+    div.querySelector('.ctext').textContent=q.choices[idx]||'';
+    div.onclick=()=>{state.answers[state.current]=idx;renderQuestion();};
+    wrap.appendChild(div);
+  });
+
+  document.querySelectorAll('.q-grid-item').forEach((el,i)=>{
+    el.classList.toggle('answered',state.answers[i]!==undefined);
+    el.classList.toggle('current',i===state.current);
+    el.classList.toggle('has-time',(state.qTimeSpent[i]||0)>0);
+  });
+  $('btnPrev').disabled=state.current===0;
+  $('btnNext').textContent=state.current===QUESTIONS.length-1?'ข้อสุดท้าย':'ข้อถัดไป';
+}
+$('btnPrev').onclick=()=>{if(state.current>0) openQuestion(state.current-1);};
+$('btnNext').onclick=()=>{if(state.current<QUESTIONS.length-1) openQuestion(state.current+1);};
+$('btnSubmit').onclick=()=>{
+  const u=QUESTIONS.length-Object.keys(state.answers).length;
+  if(confirm(u>0?`ยังไม่ได้ตอบอีก ${u} ข้อ ต้องการส่งเลยหรือไม่?`:`ต้องการส่งข้อสอบหรือไม่?`)) finishExam('submitted');
+};
+
+/* ── FINISH ── */
+async function finishExam(reason) {
+  if(state.examEnded) return; state.examEnded=true;
+  cancelAnimationFrame(state.qTimerRAF);
+  accumulateQTime(state.current);
+  clearInterval(state.timerInterval); clearInterval(state.faceDetectInterval);
+  stopCamera(); if(document.fullscreenElement) document.exitFullscreen().catch(()=>{});
+  const totalSec=CONFIG.examDurationSec-state.remainingSec;
+  const score=computeScore(), maxScore=QUESTIONS.length;
+  logEvent('submit',`ส่งข้อสอบ(${reason}) คะแนน${score}/${maxScore}`);
+  showResultOverlay({score,maxScore,totalSec,reason});
+  await saveToSupabase({score,maxScore,totalSec,reason,disqualified:false});
+}
+async function disqualify(reasonText) {
+  if(state.examEnded) return; state.examEnded=true;
+  cancelAnimationFrame(state.qTimerRAF); accumulateQTime(state.current);
+  clearInterval(state.timerInterval); clearInterval(state.faceDetectInterval);
+  stopCamera(); if(document.fullscreenElement) document.exitFullscreen().catch(()=>{});
+  const totalSec=CONFIG.examDurationSec-state.remainingSec;
+  logEvent('disqualify',reasonText);
+  showDisqualifyOverlay(reasonText);
+  await saveToSupabase({score:computeScore(),maxScore:QUESTIONS.length,totalSec,reason:'disqualified',disqualified:true,disqReason:reasonText});
+}
+function computeScore() {
+  return QUESTIONS.reduce((s,q,i)=>s+(q.answerIndex!==undefined&&state.answers[i]===q.answerIndex?1:0),0);
+}
+
+/* ── SAVE ── */
+async function saveToSupabase({score,maxScore,totalSec,reason,disqualified,disqReason}) {
+  $('savingIndicator').classList.remove('hidden');
+  $('savingText').textContent='กำลังบันทึกผลการสอบ...';
+  const qt={};
+  Object.keys(state.qTimeSpent).forEach(k=>{qt[k]=Math.round(state.qTimeSpent[k]*10)/10;});
+  const answersOriginal={};
+  QUESTIONS.forEach((q,i)=>{
+    const gn=state.answers[i];
+    if(gn!==undefined) answersOriginal[q.originalId]=q.choiceMap[gn];
+  });
+  const payload={
+    exam_id:CONFIG.examId, student_id:state.student.id, student_name:state.student.name,
+    class:state.student.class, number:state.student.number,
+    answers:state.answers, answers_original:answersOriginal,
+    question_order:QUESTIONS.map(q=>q.originalId),
+    q_time_spent:qt, total_sec:totalSec, score, max_score:maxScore,
+    pass_threshold:CONFIG.passPercent,
+    disqualified:disqualified||false, disq_reason:disqReason||null,
+    tab_switches:state.tabSwitchCount, face_missing:state.faceMissingCount,
+    event_log:state.eventLog, submitted_at:new Date().toISOString(),
+  };
+  if(sbClient&&!SUPABASE_URL.includes('YOUR_PROJECT')) {
+    try {
+      const {error}=await sbClient.from('exam_results').insert(payload);
+      if(error) throw error;
+      $('savingText').textContent='✓ บันทึกผลการสอบเรียบร้อยแล้ว';
+    } catch(err) {
+      $('savingText').textContent='⚠ บันทึกไม่สำเร็จ: '+err.message;
+    }
+  } else {
+    console.log('📋 [DEV] payload:',payload);
+    $('savingText').textContent='[DEV] ผลสอบแสดงใน Console';
+  }
+}
+
+/* ── RESULT OVERLAYS ── */
+function showResultOverlay({score,maxScore,totalSec,reason}) {
+  const pct=Math.round((score/maxScore)*100);
+  const passed = pct >= CONFIG.passPercent;
+  $('ovIcon').className='ov-icon success'; $('ovIcon').textContent='✓';
+  $('ovTitle').textContent=reason==='timeout'?'หมดเวลาทำข้อสอบ':'ส่งข้อสอบสำเร็จ';
+  $('ovText').textContent=`${state.student.name} — ${state.student.class} เลขที่ ${state.student.number}`;
+  $('ovLogBox').classList.add('hidden');
+
+  // pass/fail banner
+  const banner=$('ovResultBanner');
+  banner.classList.remove('hidden');
+  banner.className=`result-banner ${passed?'pass':'fail'}`;
+  banner.textContent=passed?`✓ ผ่านเกณฑ์ ${CONFIG.passPercent}% (${Math.ceil(maxScore*CONFIG.passPercent/100)}/${maxScore} ข้อ)`:`✗ ไม่ผ่านเกณฑ์ ${CONFIG.passPercent}% (ต้องได้ ${Math.ceil(maxScore*CONFIG.passPercent/100)}/${maxScore} ข้อขึ้นไป)`;
+
+  const s=$('ovScoreSummary'); s.classList.remove('hidden');
+  s.innerHTML=`<div class="score-cell"><div class="sc-val gold">${score}/${maxScore}</div><div class="sc-label">คะแนนที่ได้</div></div><div class="score-cell"><div class="sc-val${pct>=CONFIG.passPercent?' safe':''}">${pct}%</div><div class="sc-label">เปอร์เซ็นต์</div></div><div class="score-cell"><div class="sc-val">${fmtSec(totalSec)}</div><div class="sc-label">เวลารวมที่ใช้</div></div>`;
+
+  const L=['ก','ข','ค','ง'];
+  const rows=QUESTIONS.map((q,i)=>{
+    const ans=state.answers[i];
+    const ok=q.answerIndex!==undefined&&ans===q.answerIndex;
+    const sp=state.qTimeSpent[i]||0;
+    const topicLabel=q.topic==='bio'?'🔬':'⚗';
+    return`<tr><td class="t-mono">${topicLabel}ข้อ${i+1}<span style="font-size:10px;color:var(--ink-600)"> (#${q.originalId})</span></td><td class="t-mono">${fmtSec(Math.round(sp))}</td><td class="${ans!==undefined?(ok?'t-ans':'t-skip'):'t-skip'}">${ans!==undefined?L[ans]:'-'}</td><td style="font-size:11px;color:var(--paper-dim)">${ans!==undefined?(ok?'✓ ถูก':'✗ ผิด'):'— ไม่ตอบ'}</td></tr>`;
+  }).join('');
+  const t=$('ovQTimeTable'); t.classList.remove('hidden');
+  t.innerHTML=`<table><thead><tr><th>ข้อ</th><th>เวลา</th><th>คำตอบ</th><th>ผล</th></tr></thead><tbody>${rows}</tbody></table>`;
+  $('savingIndicator').classList.remove('hidden');
+  $('fullOverlay').style.display='flex';
+}
+function showDisqualifyOverlay(reasonText) {
+  $('ovIcon').className='ov-icon danger'; $('ovIcon').textContent='!';
+  $('ovResultBanner').classList.add('hidden');
+  $('ovTitle').textContent='ถูกตัดสิทธิ์การสอบ'; $('ovText').textContent=reasonText;
+  $('ovScoreSummary').classList.add('hidden'); $('ovQTimeTable').classList.add('hidden');
+  const lb=$('ovLogBox'); lb.classList.remove('hidden');
+  lb.innerHTML=state.eventLog.slice(-12).map(e=>{
+    const cls=e.type==='tab_switch'?'lt-tab':e.type==='face_missing'?'lt-face':'lt-sys';
+    const t=new Date(e.timestamp).toLocaleTimeString('th-TH');
+    return`<div><span class="${cls}">[${t}]</span> ${e.message}</div>`;
+  }).join('');
+  $('savingIndicator').classList.remove('hidden'); $('fullOverlay').style.display='flex';
+}
+function stopCamera() {
+  if(state.camStream) state.camStream.getTracks().forEach(t=>t.stop());
+  $('camMonitor').classList.add('hidden');
+}
+
+/* ── PROCTORING ── */
+function startTabSwitchWatcher() {
+  document.addEventListener('visibilitychange',onVisibilityChange);
+  window.addEventListener('blur',onWindowBlur);
+}
+let lastTabWarnAt=0;
+function registerTabSwitch(source) {
+  if(state.examEnded||!state.examStarted) return;
+  const now=Date.now(); if(now-lastTabWarnAt<600) return; lastTabWarnAt=now;
+  state.tabSwitchCount++; $('tabCountText').textContent=state.tabSwitchCount;
+  logEvent('tab_switch',`สลับแท็บ(${source}) ครั้งที่${state.tabSwitchCount}`);
+  if(state.tabSwitchCount>CONFIG.maxTabSwitch) disqualify(`สลับหน้าจอ/แท็บเกิน ${CONFIG.maxTabSwitch} ครั้ง`);
+  else showWarningToast(`ตรวจพบการสลับหน้าจอ/แท็บ — ห้ามออกจากหน้าสอบ`,state.tabSwitchCount,CONFIG.maxTabSwitch);
+}
+function onVisibilityChange(){if(document.hidden) registerTabSwitch('visibility');}
+function onWindowBlur(){registerTabSwitch('blur');}
+document.addEventListener('fullscreenchange',()=>{
+  if(state.examStarted&&!state.examEnded&&CONFIG.requireFullscreen&&!document.fullscreenElement)
+    registerTabSwitch('exit-fullscreen');
+});
+function startExamFaceWatcher() {
+  const ctx=$('examCamCanvas').getContext('2d');
+  state.faceDetectInterval=setInterval(async()=>{
+    if(state.examEnded||!state.faceModelReady||$('examCamVideo').videoWidth===0) return;
+    $('examCamCanvas').width=$('examCamVideo').videoWidth;
+    $('examCamCanvas').height=$('examCamVideo').videoHeight;
+    const det=await faceapi.detectSingleFace($('examCamVideo'),new faceapi.TinyFaceDetectorOptions());
+    ctx.clearRect(0,0,$('examCamCanvas').width,$('examCamCanvas').height);
+    if(det){
+      ctx.strokeStyle='#4f9a72';ctx.lineWidth=2;const b=det.box;
+      ctx.strokeRect(b.x,b.y,b.width,b.height);
+      if(state.faceCurrentlyMissing){
+        state.faceCurrentlyMissing=false;state.faceMissingTimerStart=null;
+        $('monitorDot').className='status-dot live';$('monitorText').textContent='กำลังตรวจสอบ';
+        $('camDot').className='status-dot live';$('camStatusText').textContent='ปกติ';
+        logEvent('face_restored','กลับมาพบใบหน้าแล้ว');
+      }
+    } else {
+      if(!state.faceCurrentlyMissing){
+        state.faceCurrentlyMissing=true;state.faceMissingTimerStart=Date.now();
+        $('monitorDot').className='status-dot warn';$('monitorText').textContent='ไม่พบใบหน้า...';
+        $('camDot').className='status-dot warn';$('camStatusText').textContent='ไม่พบใบหน้า';
+      } else if(Date.now()-state.faceMissingTimerStart>=CONFIG.faceMissingGraceMs){
+        registerFaceMissing();state.faceMissingTimerStart=Date.now()+999999;
+      }
+    }
+  },CONFIG.faceCheckIntervalMs);
+}
+function registerFaceMissing() {
+  if(state.examEnded) return;
+  state.faceMissingCount++;$('faceCountText').textContent=state.faceMissingCount;
+  $('camDot').className='status-dot danger';
+  logEvent('face_missing',`ไม่พบใบหน้า ครั้งที่${state.faceMissingCount}`);
+  if(state.faceMissingCount>CONFIG.maxFaceMissing) disqualify(`ตรวจไม่พบใบหน้าเกิน ${CONFIG.maxFaceMissing} ครั้ง`);
+  else showWarningToast(`ไม่พบใบหน้าในกล้อง — กรุณานั่งในกรอบกล้อง`,state.faceMissingCount,CONFIG.maxFaceMissing);
+}
+
+/* ── TOAST ── */
+let toastTimeout=null;
+function showWarningToast(msg,count,max) {
+  $('warningMsg').textContent=msg;$('warningCount').textContent=`${count}/${max}`;
+  const t=$('warningToast');t.classList.add('show');clearTimeout(toastTimeout);
+  toastTimeout=setTimeout(()=>t.classList.remove('show'),3500);
+}
+
+/* ── SECURITY ── */
+document.addEventListener('contextmenu',e=>{if(state.examStarted&&!state.examEnded) e.preventDefault();});
+document.addEventListener('keydown',e=>{
+  if(!state.examStarted||state.examEnded) return;
+  if(['F12'].includes(e.key)||((e.ctrlKey||e.metaKey)&&['c','v','u','p','s'].includes(e.key.toLowerCase())))
+    {e.preventDefault();logEvent('system',`บล็อกปุ่ม:${e.key}`);}
+});
+document.addEventListener('copy',e=>{if(state.examStarted&&!state.examEnded) e.preventDefault();});
+window.addEventListener('beforeunload',e=>{if(state.examStarted&&!state.examEnded){e.preventDefault();e.returnValue='';}});
+
+/* ════ TEACHER PANEL ════ */
+let teacherLoggedIn=false, allResults=[], filteredResults=[], sortKey='submitted_at', sortAsc=false;
+
+$('btnTeacherLogin').onclick=()=>{
+  $('teacherOverlay').classList.add('show');
+  if(!teacherLoggedIn) showTeacherLogin(); else showTeacherDashboard();
+};
+$('btnTeacherLogout').onclick=async()=>{
+  if(sbClient) try{await sbClient.auth.signOut();}catch(e){}
+  teacherLoggedIn=false;
+  $('teacherLoginPanel').style.display='block';
+  $('teacherDashboard').classList.remove('show');
+  $('teacherNameTag').textContent='';
+  $('btnTeacherLogin').className='btn';
+  $('teacherOverlay').classList.remove('show');
+};
+function showTeacherLogin(){$('teacherLoginPanel').style.display='block';$('teacherDashboard').classList.remove('show');}
+function showTeacherDashboard(){$('teacherLoginPanel').style.display='none';$('teacherDashboard').classList.add('show');loadResults();}
+
+$('btnTeacherDoLogin').onclick=async()=>{
+  const email=$('teacherEmail').value.trim(), pass=$('teacherPassword').value;
+  $('teacherLoginError').textContent='';
+  $('btnTeacherDoLogin').textContent='กำลังเข้าสู่ระบบ...';
+  $('btnTeacherDoLogin').disabled=true;
+  if(!sbClient||SUPABASE_URL.includes('YOUR_PROJECT')){
+    teacherLoggedIn=true;
+    $('teacherNameTag').textContent=email||'ครู (DEV)';
+    $('btnTeacherLogin').className='btn teacher-active';
+    $('btnTeacherDoLogin').textContent='เข้าสู่ระบบ';
+    $('btnTeacherDoLogin').disabled=false;
+    showTeacherDashboard(); return;
+  }
+  try {
+    const {data,error}=await sbClient.auth.signInWithPassword({email,password:pass});
+    if(error) throw error;
+    teacherLoggedIn=true;
+    $('teacherNameTag').textContent=data.user.email;
+    $('btnTeacherLogin').className='btn teacher-active';
+    showTeacherDashboard();
+  } catch(err) {
+    $('teacherLoginError').textContent='❌ '+err.message;
+  } finally {
+    $('btnTeacherDoLogin').textContent='เข้าสู่ระบบ';
+    $('btnTeacherDoLogin').disabled=false;
+  }
+};
+$('teacherPassword').addEventListener('keydown',e=>{if(e.key==='Enter') $('btnTeacherDoLogin').click();});
+
+async function loadResults() {
+  $('tLoadingRow').classList.remove('hidden');$('tTable').classList.add('hidden');$('tEmptyRow').classList.add('hidden');
+  if(!sbClient||SUPABASE_URL.includes('YOUR_PROJECT')){allResults=generateSampleData();renderTable();return;}
+  try {
+    const {data,error}=await sbClient.from('exam_results').select('*').eq('exam_id',CONFIG.examId).order('submitted_at',{ascending:false});
+    if(error) throw error;
+    allResults=data||[]; renderTable();
+  } catch(err) {
+    $('tLoadingRow').textContent='⚠ โหลดข้อมูลไม่สำเร็จ: '+err.message;
+  }
+}
+function generateSampleData() {
+  // ตัวอย่าง 40 ข้อ
+  const makeAns=(n)=>{const a={};for(let i=0;i<n;i++)a[i]=Math.floor(Math.random()*4);return a;};
+  const makeTime=(n)=>{const t={};for(let i=0;i<n;i++)t[i]=Math.floor(30+Math.random()*60);return t;};
+  return [
+    {id:'r1',student_id:'1001',student_name:'สมชาย ใจดี',class:'ม.4/1',number:1,score:28,max_score:40,total_sec:2200,disqualified:false,tab_switches:0,face_missing:0,submitted_at:new Date().toISOString(),answers:makeAns(40),q_time_spent:makeTime(40),question_order:QUESTIONS_MASTER.map(q=>q.id)},
+    {id:'r2',student_id:'1002',student_name:'สมหญิง รักเรียน',class:'ม.4/1',number:2,score:22,max_score:40,total_sec:2800,disqualified:false,tab_switches:1,face_missing:0,submitted_at:new Date(Date.now()-120000).toISOString(),answers:makeAns(40),q_time_spent:makeTime(40),question_order:QUESTIONS_MASTER.map(q=>q.id)},
+    {id:'r3',student_id:'1003',student_name:'วิชัย ทุจริต',class:'ม.4/2',number:5,score:10,max_score:40,total_sec:900,disqualified:true,tab_switches:4,face_missing:1,submitted_at:new Date(Date.now()-300000).toISOString(),answers:makeAns(15),q_time_spent:makeTime(15),question_order:QUESTIONS_MASTER.map(q=>q.id)},
+  ];
+}
+
+function applyFilter() {
+  const search=$('tSearch').value.toLowerCase();
+  const cls=$('tFilterClass').value;
+  const status=$('tFilterStatus').value;
+  filteredResults=allResults.filter(r=>{
+    const matchText=!search||r.student_name?.toLowerCase().includes(search)||r.student_id?.toLowerCase().includes(search)||r.class?.toLowerCase().includes(search);
+    const matchClass=!cls||r.class===cls;
+    const matchStatus=!status||(status==='disq'?r.disqualified:status==='pass'?!r.disqualified&&(r.score/r.max_score)>=CONFIG.passPercent/100:!r.disqualified&&(r.score/r.max_score)<CONFIG.passPercent/100);
+    return matchText&&matchClass&&matchStatus;
+  });
+  doSort(); renderRows();
+}
+function sortBy(key) {
+  if(sortKey===key) sortAsc=!sortAsc; else{sortKey=key;sortAsc=true;}
+  document.querySelectorAll('table.t-table th').forEach(th=>th.classList.remove('sorted'));
+  const th=$('th-'+key);
+  if(th){th.classList.add('sorted');th.querySelector('.sort-arrow').textContent=sortAsc?'↑':'↓';}
+  doSort(); renderRows();
+}
+function doSort() {
+  filteredResults.sort((a,b)=>{
+    let va=a[sortKey],vb=b[sortKey];
+    if(typeof va==='string') va=va.toLowerCase(),vb=(vb||'').toLowerCase();
+    if(va===undefined||va===null) va=0; if(vb===undefined||vb===null) vb=0;
+    return sortAsc?(va>vb?1:va<vb?-1:0):(va<vb?1:va>vb?-1:0);
+  });
+}
+function renderTable() {
+  const classes=[...new Set(allResults.map(r=>r.class).filter(Boolean))].sort();
+  const sel=$('tFilterClass'); sel.innerHTML='<option value="">ทุกชั้น</option>';
+  classes.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o);});
+  const total=allResults.length, disqCount=allResults.filter(r=>r.disqualified).length;
+  const valid=allResults.filter(r=>!r.disqualified);
+  const avg=valid.length?(valid.reduce((s,r)=>s+(r.score/r.max_score*100),0)/valid.length).toFixed(1):'—';
+  const pass=valid.filter(r=>(r.score/r.max_score)>=CONFIG.passPercent/100).length;
+  $('statTotal').textContent=total;$('statAvg').textContent=avg+(valid.length?'%':'');
+  $('statPass').textContent=pass;$('statDisq').textContent=disqCount;
+  filteredResults=[...allResults]; doSort(); renderRows();
+}
+function renderRows() {
+  $('tLoadingRow').classList.add('hidden'); const tbody=$('tBody'); tbody.innerHTML='';
+  if(filteredResults.length===0){$('tTable').classList.add('hidden');$('tEmptyRow').classList.remove('hidden');return;}
+  $('tTable').classList.remove('hidden');$('tEmptyRow').classList.add('hidden');
+  filteredResults.forEach(r=>{
+    const pct=r.max_score?Math.round((r.score/r.max_score)*100):0;
+    const threshold=CONFIG.passPercent;
+    const status=r.disqualified?'<span class="badge disq">ตัดสิทธิ์</span>':pct>=threshold?'<span class="badge pass">ผ่าน</span>':'<span class="badge fail">ไม่ผ่าน</span>';
+    const barCls=pct>=threshold?'high':pct<30?'low':'';
+    const dt=r.submitted_at?new Date(r.submitted_at).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'}):'—';
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td class="mono-cell">${r.number||'—'}</td><td class="mono-cell">${r.student_id||'—'}</td><td>${r.student_name||'—'}</td><td>${r.class||'—'}</td><td><div class="score-bar-cell"><span class="mono-cell" style="min-width:60px">${r.score}/${r.max_score} <span style="color:var(--paper-dim);font-size:10px">(${pct}%)</span></span><div class="score-bar"><div class="score-bar-fill ${barCls}" style="width:${pct}%"></div></div></div></td><td class="mono-cell">${fmtSec(r.total_sec||0)}</td><td>${status}${r.tab_switches>0?`<span style="font-family:var(--mono);font-size:10px;color:var(--gold);margin-left:4px">แท็บ×${r.tab_switches}</span>`:''}</td><td style="font-size:12px;color:var(--paper-dim)">${dt}</td><td><button class="btn btn-ghost btn-sm" onclick='showDetail(${JSON.stringify(r)})'>ดูรายละเอียด</button></td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function showDetail(r) {
+  $('detailName').textContent=r.student_name||'—';
+  $('detailSub').textContent=`รหัส ${r.student_id} | ${r.class} เลขที่ ${r.number}`;
+  const pct=r.max_score?Math.round((r.score/r.max_score)*100):0;
+  const passed=pct>=CONFIG.passPercent;
+  $('detailScoreSummary').innerHTML=`<div class="score-cell"><div class="sc-val gold">${r.score}/${r.max_score}</div><div class="sc-label">คะแนน</div></div><div class="score-cell"><div class="sc-val${passed?' safe':''}">${pct}%<br><span style="font-size:10px;color:var(--paper-dim)">${passed?'ผ่าน':'ไม่ผ่าน'}</span></div><div class="sc-label">ผล</div></div><div class="score-cell"><div class="sc-val">${fmtSec(r.total_sec||0)}</div><div class="sc-label">เวลารวม</div></div>`;
+  const L=['ก','ข','ค','ง'];
+  const qts=r.q_time_spent||{}, ans=r.answers||{};
+  const qOrder=r.question_order||QUESTIONS_MASTER.map(q=>q.id);
+  const rows=QUESTIONS_MASTER.map(q=>{
+    const si=qOrder.indexOf(q.id);
+    const a=si>=0?ans[si]:undefined;
+    const sp=si>=0?(qts[si]||qts[String(si)]||0):0;
+    const correct=q.answerIndex!==undefined&&parseInt(a)===q.answerIndex;
+    const aText=a!==undefined&&a!==null?L[parseInt(a)]:'—';
+    const topicLabel=q.topic==='bio'?'🔬':'⚗';
+    const res=a!==undefined&&a!==null?(correct?'<span style="color:var(--safe)">✓ ถูก</span>':'<span style="color:var(--alert)">✗ ผิด</span>'):'<span style="color:var(--paper-dim)">ไม่ตอบ</span>';
+    return`<tr><td class="mono-cell">${topicLabel}#${q.id}</td><td>${aText}</td><td class="mono-cell">${fmtSec(Math.round(sp))}</td><td>${res}</td></tr>`;
+  }).join('');
+  $('detailQBody').innerHTML=rows;
+  $('studentDetailModal').classList.add('show');
+}
+function closeDetailModal(){$('studentDetailModal').classList.remove('show');}
+
+/* CSV */
+function downloadCSV() {
+  const BOM='\uFEFF';
+  const qHeaders=QUESTIONS_MASTER.map((q,i)=>`ข้อ#${q.id}(${q.topic}),เวลา#${q.id}(วิ)`).join(',');
+  const header=`รหัสนักเรียน,ชื่อ-นามสกุล,ชั้น,เลขที่,คะแนน,คะแนนเต็ม,เปอร์เซ็นต์,ผล,เวลารวม(วิ),สถานะ,สลับแท็บ,ไม่พบหน้า,วันที่ส่ง,${qHeaders}`;
+  const rows=filteredResults.map(r=>{
+    const pct=r.max_score?Math.round((r.score/r.max_score)*100):0;
+    const passed=pct>=CONFIG.passPercent;
+    const status=r.disqualified?'ตัดสิทธิ์':passed?'ผ่าน':'ไม่ผ่าน';
+    const dt=r.submitted_at?new Date(r.submitted_at).toLocaleString('th-TH'):'';
+    const L=['ก','ข','ค','ง'];
+    const qOrder=r.question_order||QUESTIONS_MASTER.map(q=>q.id);
+    const qCols=QUESTIONS_MASTER.map(q=>{
+      const si=qOrder.indexOf(q.id);
+      const a=si>=0?r.answers?.[si]:undefined;
+      const sp=si>=0?(r.q_time_spent?.[si]||r.q_time_spent?.[String(si)]||0):0;
+      return`${a!==undefined&&a!==null?L[parseInt(a)]:'-'},${Math.round(sp)}`;
+    }).join(',');
+    return[r.student_id,`"${r.student_name}"`,r.class,r.number,r.score,r.max_score,pct,passed?'ผ่าน':'ไม่ผ่าน',r.total_sec||0,status,r.tab_switches||0,r.face_missing||0,`"${dt}"`,qCols].join(',');
+  });
+  const csv=BOM+[header,...rows].join('\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=`คะแนนสอบ_${CONFIG.examId}_${new Date().toLocaleDateString('th-TH')}.csv`;a.click();URL.revokeObjectURL(url);
+}
+function downloadExcel() {
+  if(window.XLSX){buildExcel();return;}
+  const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';s.onload=buildExcel;document.head.appendChild(s);
+}
+function buildExcel() {
+  const L=['ก','ข','ค','ง'];
+  const qH=QUESTIONS_MASTER.map(q=>[`ข้อ#${q.id}(${q.topic})`,`เวลา#${q.id}(วิ)`]).flat();
+  const headers=['รหัสนักเรียน','ชื่อ-นามสกุล','ชั้น','เลขที่','คะแนน','คะแนนเต็ม','เปอร์เซ็นต์','ผล','เวลารวม(วิ)','สถานะ','สลับแท็บ','ไม่พบหน้า','วันที่ส่ง',...qH];
+  const dataRows=filteredResults.map(r=>{
+    const pct=r.max_score?Math.round((r.score/r.max_score)*100):0;
+    const passed=pct>=CONFIG.passPercent;
+    const status=r.disqualified?'ตัดสิทธิ์':passed?'ผ่าน':'ไม่ผ่าน';
+    const dt=r.submitted_at?new Date(r.submitted_at).toLocaleString('th-TH'):'';
+    const qOrder=r.question_order||QUESTIONS_MASTER.map(q=>q.id);
+    const qCols=QUESTIONS_MASTER.map(q=>{
+      const si=qOrder.indexOf(q.id);
+      const a=si>=0?r.answers?.[si]:undefined;
+      const sp=si>=0?(r.q_time_spent?.[si]||r.q_time_spent?.[String(si)]||0):0;
+      return[a!==undefined&&a!==null?L[parseInt(a)]:'-',Math.round(sp)];
+    }).flat();
+    return[r.student_id,r.student_name,r.class,r.number,r.score,r.max_score,pct,passed?'ผ่าน':'ไม่ผ่าน',r.total_sec||0,status,r.tab_switches||0,r.face_missing||0,dt,...qCols];
+  });
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.aoa_to_sheet([headers,...dataRows]);
+  ws['!cols']=headers.map((_,i)=>({wch:i<4?14:12}));
+  XLSX.utils.book_append_sheet(wb,ws,'ผลการสอบ');
+  const valid=filteredResults.filter(r=>!r.disqualified);
+  const avg=valid.length?(valid.reduce((s,r)=>s+(r.score/r.max_score*100),0)/valid.length).toFixed(1):0;
+  const statsData=[
+    ['สถิติผลการสอบ',CONFIG.examTitle],
+    ['ผู้เข้าสอบทั้งหมด',filteredResults.length],
+    ['คะแนนเฉลี่ย (%)',avg],
+    [`ผ่าน (≥${CONFIG.passPercent}%)`,valid.filter(r=>(r.score/r.max_score)>=CONFIG.passPercent/100).length],
+    [`ไม่ผ่าน (<${CONFIG.passPercent}%)`,valid.filter(r=>(r.score/r.max_score)<CONFIG.passPercent/100).length],
+    ['ถูกตัดสิทธิ์',filteredResults.filter(r=>r.disqualified).length],
+    ['เกณฑ์ผ่าน (%)',CONFIG.passPercent],
+    ['จำนวนข้อ',QUESTIONS_MASTER.length],
+  ];
+  const ws2=XLSX.utils.aoa_to_sheet(statsData);ws2['!cols']=[{wch:24},{wch:16}];
+  XLSX.utils.book_append_sheet(wb,ws2,'สถิติ');
+  XLSX.writeFile(wb,`คะแนนสอบ_${CONFIG.examId}_${new Date().toLocaleDateString('th-TH').replace(/\//g,'-')}.xlsx`);
+}
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){
+    if($('studentDetailModal').classList.contains('show')){closeDetailModal();return;}
+    if($('teacherOverlay').classList.contains('show')){$('teacherOverlay').classList.remove('show');}
+  }
+});
+
+initApp();
+</script>
+</body>
+</html>
