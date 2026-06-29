@@ -1087,7 +1087,7 @@ async function saveResult({ score, max, totalSec, reason, disq, disqWhy }) {
     try {
       const { error } = await sb.from('exam_results').insert(payload);
       if (error) throw error;
-      $('ovSaveText').textContent = '✓ บันทึกผลสำเร็จ';
+      $('ovSave').innerHTML = '<span style="color:var(--green)">✓ บันทึกผลสำเร็จ</span>';
     } catch(err) { $('ovSaveText').textContent = '⚠ บันทึกไม่สำเร็จ: '+err.message; }
   } else {
     console.log('📋 [DEV] payload:', payload);
