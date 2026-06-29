@@ -923,16 +923,23 @@ function renderQ(idx) {
   renderMath($('qText'));
 
   // Image
-  if (q.image?.url) {
-    $('qImgWrap').classList.remove('hidden');
-    $('qImg').src = q.image.url;
-    $('qImg').alt = `ภาพประกอบข้อ ${idx+1}`;
-    $('qImgCaption').style.display = q.image.caption ? '' : 'none';
-    $('qImgCaption').textContent   = q.image.caption ? '📷 '+q.image.caption : '';
-    $('qImg').onerror = () => { $('qImgWrap').innerHTML = '<div style="padding:14px;color:var(--text-2);font-size:13px">⚠ โหลดรูปภาพไม่สำเร็จ</div>'; };
-  } else {
-    $('qImgWrap').classList.add('hidden');
-  }
+$('qImg').onerror = null;
+$('qImg').src = '';
+
+if (q.image?.url) {
+  $('qImgWrap').classList.remove('hidden');
+  const capturedIdx = idx;
+  $('qImgCaption').style.display = q.image.caption ? '' : 'none';
+  $('qImgCaption').textContent   = q.image.caption ? '📷 '+q.image.caption : '';
+  $('qImg').alt = `ภาพประกอบข้อ ${idx+1}`;
+  $('qImg').onerror = () => {
+    if (S.current !== capturedIdx) return;
+    $('qImgWrap').innerHTML = '<div style="padding:14px;color:var(--text-2);font-size:13px">⚠ โหลดรูปภาพไม่สำเร็จ</div>';
+  };
+  $('qImg').src = q.image.url;
+} else {
+  $('qImgWrap').classList.add('hidden');
+}
 
   // ══ FIX: Choices — ใช้ q.choices ของข้อนี้โดยตรง ไม่มี async, ไม่มี closure เก่า
   const wrap = $('qChoices');
