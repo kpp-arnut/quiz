@@ -925,6 +925,7 @@ function renderQ(idx) {
   // Image
 $('qImg').onerror = null;
 $('qImg').src = '';
+$('qImgWrap').classList.add('hidden');
 
 if (q.image?.url) {
   $('qImgWrap').classList.remove('hidden');
@@ -934,11 +935,9 @@ if (q.image?.url) {
   $('qImg').alt = `ภาพประกอบข้อ ${idx+1}`;
   $('qImg').onerror = () => {
     if (S.current !== capturedIdx) return;
-    $('qImgWrap').innerHTML = '<div style="padding:14px;color:var(--text-2);font-size:13px">⚠ โหลดรูปภาพไม่สำเร็จ</div>';
+    $('qImgWrap').classList.add('hidden'); // ← แค่ซ่อน ไม่ทำลาย DOM
   };
   $('qImg').src = q.image.url;
-} else {
-  $('qImgWrap').classList.add('hidden');
 }
 
   // ══ FIX: Choices — ใช้ q.choices ของข้อนี้โดยตรง ไม่มี async, ไม่มี closure เก่า
